@@ -287,10 +287,11 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
       const SUPABASE_URL = "https://hdzeqsijrntnbdqdqyai.supabase.co";
-      const SUPABASE_KEY = "sb_publishable_T12X30Fcx5stbhd5r6OFuA_pn90oSbg";
-      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const SUPABASE_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkemVxc2lqcm50bmJkcWRxeWFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjUyMzMsImV4cCI6MjA4Nzk0MTIzM30.4Cd4h4XEdDZUvpQU6rlM08cEU8cZ5wqW3J_oYfxJVqk";
 
       const BEST_OF = 3;
       const NEED_WINS = 2;
@@ -309,7 +310,14 @@
       const rematchBtn = document.getElementById("rematchBtn");
       const pickBtns = Array.from(document.querySelectorAll(".pick-btn"));
 
-      const myClientId = crypto.randomUUID();
+      const myClientId =
+        (window.crypto && window.crypto.randomUUID && window.crypto.randomUUID()) ||
+        `cid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const supabaseGlobal = window.supabase;
+      const supabase =
+        supabaseGlobal && typeof supabaseGlobal.createClient === "function"
+          ? supabaseGlobal.createClient(SUPABASE_URL, SUPABASE_KEY)
+          : null;
       let myName = "";
       let roomCode = "";
       let channel = null;
@@ -328,6 +336,11 @@
         if (cls) p.className = cls;
         p.textContent = `${new Date().toLocaleTimeString()} ${message}`;
         logBox.prepend(p);
+      }
+
+      function setLobbyDisabled(disabled) {
+        createBtn.disabled = disabled;
+        joinBtn.disabled = disabled;
       }
 
       function normalizeRoom(raw) {
@@ -602,20 +615,30 @@
       }
 
       async function joinRoom(code, displayName) {
+        if (!supabase) {
+          addLog("Supabase SDK 加载失败（可能是 CDN 被拦截）。请开代理后刷新再试。", "warn");
+          return;
+        }
+
         roomCode = code;
         myName = displayName;
         roomText.textContent = roomCode;
 
-        if (channel) {
-          await supabase.removeChannel(channel);
-        }
+        try {
+          if (channel) {
+            await supabase.removeChannel(channel);
+          }
 
-        channel = supabase.channel(`rps-room-${roomCode}`, {
-          config: {
-            broadcast: { self: true },
-            presence: { key: myClientId },
-          },
-        });
+          channel = supabase.channel(`rps-room-${roomCode}`, {
+            config: {
+              broadcast: { self: true },
+              presence: { key: myClientId },
+            },
+          });
+        } catch (err) {
+          addLog(`创建房间通道失败：${err.message || err}`, "warn");
+          return;
+        }
 
         channel
           .on("presence", { event: "sync" }, async () => {
@@ -707,7 +730,12 @@
         if (!name) return;
         const code = randomRoomCode();
         roomInput.value = code;
-        await joinRoom(code, name);
+        addLog(`正在创建房间 ${code} ...`);
+        try {
+          await joinRoom(code, name);
+        } catch (err) {
+          addLog(`创建房间异常：${err.message || err}`, "warn");
+        }
       });
 
       joinBtn.addEventListener("click", async () => {
@@ -719,7 +747,12 @@
           return;
         }
         roomInput.value = code;
-        await joinRoom(code, name);
+        addLog(`正在加入房间 ${code} ...`);
+        try {
+          await joinRoom(code, name);
+        } catch (err) {
+          addLog(`加入房间异常：${err.message || err}`, "warn");
+        }
       });
 
       pickBtns.forEach((btn) => {
@@ -734,6 +767,10 @@
       const preRoom = normalizeRoom(params.get("room"));
       if (preRoom) roomInput.value = preRoom;
 
+      if (!supabase) {
+        setLobbyDisabled(true);
+        addLog("Supabase SDK 未成功加载，房间功能已禁用。", "warn");
+      }
       renderAll();
       addLog("准备就绪：输入昵称后创建房间，或输入房间号加入。", "ok");
     </script>
