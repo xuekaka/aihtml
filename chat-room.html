@@ -166,6 +166,16 @@
         border-color: #a8d8f7;
       }
 
+      .bubble.image {
+        padding: 0.28rem;
+      }
+
+      .bubble img {
+        display: block;
+        max-width: min(70vw, 380px);
+        border-radius: 10px;
+      }
+
       .composer {
         border-top: 1px solid var(--line);
         padding: 0.7rem;
@@ -223,6 +233,8 @@
         <section class="msgs" id="msgs"></section>
 
         <footer class="composer">
+          <input id="imageInput" type="file" accept="image/*" hidden />
+          <button class="btn" id="imageBtn" type="button">发图片</button>
           <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
           <button class="btn" id="sendBtn">发送</button>
         </footer>
@@ -237,7 +249,12 @@
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkemVxc2lqcm50bmJkcWRxeWFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjUyMzMsImV4cCI6MjA4Nzk0MTIzM30.4Cd4h4XEdDZUvpQU6rlM08cEU8cZ5wqW3J_oYfxJVqk";
 
       const ALLOWED_ACCOUNTS = new Set(["白白", "飞飞"]);
+      const ACCOUNT_DIR = {
+        白白: "baibai",
+        飞飞: "feifei",
+      };
       const TABLE_NAME = "chat_messages";
+      const IMAGE_BUCKET = "chat-images";
 
       const loginPanel = document.getElementById("loginPanel");
       const chatPanel = document.getElementById("chatPanel");
@@ -247,6 +264,8 @@
       const statusText = document.getElementById("statusText");
       const meText = document.getElementById("meText");
       const msgs = document.getElementById("msgs");
+      const imageInput = document.getElementById("imageInput");
+      const imageBtn = document.getElementById("imageBtn");
       const msgInput = document.getElementById("msgInput");
       const sendBtn = document.getElementById("sendBtn");
 
@@ -288,7 +307,16 @@
 
         const bubble = document.createElement("div");
         bubble.className = "bubble";
-        bubble.textContent = row.content;
+        if (row.type === "image" && row.image_url) {
+          bubble.classList.add("image");
+          const img = document.createElement("img");
+          img.src = row.image_url;
+          img.alt = `${row.sender} 发的图片`;
+          img.loading = "lazy";
+          bubble.appendChild(img);
+        } else {
+          bubble.textContent = row.content;
+        }
 
         item.append(meta, bubble);
         msgs.appendChild(item);
@@ -304,7 +332,7 @@
         setStatus("正在读取最近100条记录...");
         const { data, error } = await sbClient
           .from(TABLE_NAME)
-          .select("id,sender,content,created_at")
+          .select("id,sender,type,content,image_url,created_at")
           .order("created_at", { ascending: false })
           .limit(100);
 
@@ -325,11 +353,14 @@
         if (!me) return;
 
         sendBtn.disabled = true;
+        imageBtn.disabled = true;
         const { error } = await sbClient.from(TABLE_NAME).insert({
           sender: me,
+          type: "text",
           content,
         });
         sendBtn.disabled = false;
+        imageBtn.disabled = false;
 
         if (error) {
           setStatus("发送失败");
@@ -339,6 +370,112 @@
 
         msgInput.value = "";
         msgInput.focus();
+      }
+
+      async function readImage(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(img);
+          };
+          img.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            reject(e);
+          };
+          img.src = url;
+        });
+      }
+
+      async function compressImage(file) {
+        const img = await readImage(file);
+        const maxSide = 1920;
+        const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * ratio));
+        const height = Math.max(1, Math.round(img.height * ratio));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+        const quality = outputType === "image/jpeg" ? 0.88 : undefined;
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, outputType, quality));
+        if (!blob) return file;
+        return blob;
+      }
+
+      function extByType(type) {
+        if (type === "image/png") return "png";
+        if (type === "image/webp") return "webp";
+        return "jpg";
+      }
+
+      async function sendImage(file) {
+        if (!file || !me) return;
+        if (!file.type || !file.type.startsWith("image/")) {
+          alert("请选择图片文件");
+          return;
+        }
+
+        sendBtn.disabled = true;
+        imageBtn.disabled = true;
+        setStatus("正在压缩图片...");
+
+        let blob;
+        try {
+          blob = await compressImage(file);
+        } catch (err) {
+          sendBtn.disabled = false;
+          imageBtn.disabled = false;
+          setStatus("图片处理失败");
+          alert(`图片处理失败：${err.message || err}`);
+          return;
+        }
+
+        const type = blob.type || file.type || "image/jpeg";
+        const ext = extByType(type);
+        const safeDir = ACCOUNT_DIR[me] || "user";
+        const path = `${safeDir}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${ext}`;
+
+        setStatus("正在上传图片...");
+        const { error: uploadErr } = await sbClient.storage.from(IMAGE_BUCKET).upload(path, blob, {
+          contentType: type,
+          upsert: false,
+        });
+
+        if (uploadErr) {
+          sendBtn.disabled = false;
+          imageBtn.disabled = false;
+          setStatus("上传失败");
+          alert(`上传失败：${uploadErr.message}`);
+          return;
+        }
+
+        const { data: urlData } = sbClient.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+        const imageUrl = urlData && urlData.publicUrl ? urlData.publicUrl : "";
+
+        const { error: insertErr } = await sbClient.from(TABLE_NAME).insert({
+          sender: me,
+          type: "image",
+          content: "图片",
+          image_url: imageUrl,
+        });
+
+        sendBtn.disabled = false;
+        imageBtn.disabled = false;
+
+        if (insertErr) {
+          setStatus("发送失败");
+          alert(`发送图片消息失败：${insertErr.message}`);
+          return;
+        }
+
+        imageInput.value = "";
+        setStatus("已连接，实时同步中");
       }
 
       async function subscribeRealtime() {
@@ -395,6 +532,11 @@
       });
 
       sendBtn.addEventListener("click", sendMessage);
+      imageBtn.addEventListener("click", () => imageInput.click());
+      imageInput.addEventListener("change", () => {
+        const file = imageInput.files && imageInput.files[0];
+        if (file) sendImage(file);
+      });
       msgInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
