@@ -62,8 +62,8 @@
 
       .hero {
         min-height: 88vh;
-        display: grid;
-        place-items: center;
+        display: flex;
+        align-items: center;
         position: relative;
         isolation: isolate;
         padding: 3rem 1.2rem;
@@ -74,8 +74,9 @@
         position: absolute;
         inset: 0;
         background:
-          linear-gradient(180deg, rgba(20, 31, 37, 0.22), rgba(25, 20, 15, 0.56)),
-          url("https://images.unsplash.com/photo-1464820453369-31d2c0b651af?auto=format&fit=crop&w=2200&q=80") center/cover;
+          linear-gradient(96deg, rgba(18, 29, 35, 0.62) 0%, rgba(18, 29, 35, 0.42) 38%, rgba(18, 29, 35, 0.18) 70%, rgba(18, 29, 35, 0.1) 100%),
+          linear-gradient(180deg, rgba(20, 31, 37, 0.16), rgba(25, 20, 15, 0.52)),
+          url("https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2400&q=80") 74% center/cover;
         z-index: -2;
         transform: scale(1.06);
       }
@@ -89,7 +90,9 @@
       }
 
       .hero-panel {
-        width: min(1000px, 95vw);
+        width: min(760px, 92vw);
+        margin-left: clamp(0.2rem, 4vw, 3.5rem);
+        margin-right: auto;
         background: rgba(255, 250, 241, 0.82);
         backdrop-filter: blur(7px);
         border: 1px solid #ffffff9c;
@@ -361,6 +364,8 @@
         }
 
         .hero-panel {
+          margin-left: auto;
+          margin-right: auto;
           border-radius: 18px;
         }
 
@@ -477,6 +482,18 @@
           </figure>
           <figure class="shot">
             <img src="https://images.unsplash.com/photo-1519904981063-b0cf448d479e?auto=format&fit=crop&w=900&q=80" alt="山脊晨光" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1443890923422-7819ed4101c0?auto=format&fit=crop&w=900&q=80" alt="雪山山脊徒步者" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1464823063530-08f10ed1a2dd?auto=format&fit=crop&w=900&q=80" alt="高海拔山口" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80" alt="山谷营地与河流" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1464822759844-d150ad6d1d95?auto=format&fit=crop&w=900&q=80" alt="雪峰与冰川地貌" loading="lazy" />
           </figure>
         </div>
       </section>
