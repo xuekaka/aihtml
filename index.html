@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>库拉岗日徒步详细介绍</title>
+    <meta
+      name="description"
+      content="库拉岗日徒步详细指南：最佳季节、线路分解、海拔强度、装备清单、风险提示与摄影建议。"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Manrope:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f4efe5;
+        --paper: #fffaf1;
+        --ink: #1d2a2f;
+        --muted: #546169;
+        --accent: #d86b3f;
+        --accent-soft: #f3b38b;
+        --line: #d9cdbb;
+        --card: #fffdf8cc;
+        --shadow: 0 18px 50px rgba(36, 31, 25, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: "Manrope", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 8%, #fff 0%, transparent 35%),
+          radial-gradient(circle at 88% 16%, #f7c7aa 0%, transparent 32%),
+          linear-gradient(160deg, #f8f4ec 0%, #efe7da 55%, #e8ddcb 100%);
+        line-height: 1.65;
+        overflow-x: hidden;
+      }
+
+      .scroll-line {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 4px;
+        width: 0;
+        z-index: 999;
+        background: linear-gradient(90deg, #d86b3f 0%, #f6a676 60%, #ffd9be 100%);
+        box-shadow: 0 2px 10px rgba(216, 107, 63, 0.35);
+      }
+
+      .hero {
+        min-height: 88vh;
+        display: grid;
+        place-items: center;
+        position: relative;
+        isolation: isolate;
+        padding: 3rem 1.2rem;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, rgba(20, 31, 37, 0.22), rgba(25, 20, 15, 0.56)),
+          url("https://images.unsplash.com/photo-1464820453369-31d2c0b651af?auto=format&fit=crop&w=2200&q=80") center/cover;
+        z-index: -2;
+        transform: scale(1.06);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 55%, rgba(244, 239, 229, 0.98) 100%);
+        z-index: -1;
+      }
+
+      .hero-panel {
+        width: min(1000px, 95vw);
+        background: rgba(255, 250, 241, 0.82);
+        backdrop-filter: blur(7px);
+        border: 1px solid #ffffff9c;
+        border-radius: 26px;
+        box-shadow: var(--shadow);
+        padding: clamp(1.4rem, 2.5vw, 2.2rem);
+        animation: riseIn 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.82rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #7b6a5c;
+        font-weight: 700;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 30px;
+        height: 2px;
+        background: var(--accent);
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "Noto Serif SC", serif;
+        line-height: 1.25;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5.3vw, 4.5rem);
+        margin-top: 0.8rem;
+      }
+
+      .lead {
+        margin: 1rem 0 1.2rem;
+        color: #2f3c41;
+        font-size: clamp(1rem, 1.45vw, 1.2rem);
+        max-width: 58ch;
+      }
+
+      .hero-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .hero-chips span {
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid #e7ddce;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .section {
+        width: min(1120px, 94vw);
+        margin: 0 auto;
+        padding: 4.5rem 0 2rem;
+      }
+
+      .grid-2 {
+        display: grid;
+        gap: 1.2rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 1.15rem;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+      }
+
+      .stat {
+        display: grid;
+        gap: 0.3rem;
+      }
+
+      .stat strong {
+        color: var(--accent);
+        font-size: 1.6rem;
+        font-weight: 800;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .section-head {
+        margin-bottom: 1rem;
+      }
+
+      .section-head h2 {
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+      }
+
+      .section-head p {
+        max-width: 62ch;
+        color: var(--muted);
+      }
+
+      .timeline {
+        position: relative;
+        padding-left: 1.2rem;
+      }
+
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 0.36rem;
+        top: 0.2rem;
+        bottom: 0.2rem;
+        width: 2px;
+        background: linear-gradient(180deg, #e8b397 0%, #ca7e55 100%);
+      }
+
+      .step {
+        position: relative;
+        padding-left: 1rem;
+        margin: 0 0 1.05rem;
+      }
+
+      .step::before {
+        content: "";
+        position: absolute;
+        left: -0.05rem;
+        top: 0.6rem;
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 50%;
+        background: var(--paper);
+        border: 2px solid var(--accent);
+      }
+
+      .step h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.3rem;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr 1fr;
+        gap: 0.7rem;
+      }
+
+      .shot {
+        border-radius: 18px;
+        overflow: hidden;
+        min-height: 220px;
+        position: relative;
+        transform: translateY(0);
+        transition: transform 400ms ease, box-shadow 400ms ease;
+      }
+
+      .shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: saturate(1.08) contrast(1.05);
+        transition: transform 500ms ease;
+      }
+
+      .shot:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 14px 34px rgba(49, 38, 20, 0.3);
+      }
+
+      .shot:hover img {
+        transform: scale(1.06);
+      }
+
+      .shot.big {
+        grid-row: span 2;
+      }
+
+      .equip-list {
+        columns: 2;
+        gap: 1.25rem;
+      }
+
+      .equip-list li {
+        margin-bottom: 0.45rem;
+      }
+
+      .tips {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.9rem;
+      }
+
+      .tip {
+        padding: 1rem;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: linear-gradient(170deg, #fffdf8 0%, #f5ecde 100%);
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+
+      .reveal.in {
+        animation: revealIn 700ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+
+      footer {
+        width: min(1120px, 94vw);
+        margin: 2rem auto 3rem;
+        border-top: 1px solid var(--line);
+        padding-top: 1.2rem;
+        color: #6d5a4f;
+      }
+
+      @keyframes riseIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes revealIn {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .grid-2,
+        .tips {
+          grid-template-columns: 1fr;
+        }
+
+        .gallery {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .shot.big {
+          grid-row: span 1;
+        }
+
+        .equip-list {
+          columns: 1;
+        }
+      }
+
+      @media (max-width: 650px) {
+        .hero {
+          min-height: 72vh;
+        }
+
+        .hero-panel {
+          border-radius: 18px;
+        }
+
+        .gallery {
+          grid-template-columns: 1fr;
+        }
+
+        .shot {
+          min-height: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scroll-line" id="scrollLine"></div>
+
+    <header class="hero">
+      <div class="hero-panel">
+        <span class="eyebrow">KARJORI TREK NOTE</span>
+        <h1>库拉岗日徒步详细介绍</h1>
+        <p class="lead">
+          库拉岗日（Kula Kangri）位于喜马拉雅山脉东段，常规徒步多以山南洛扎方向组织，路线融合了高海拔垭口、冰川遗迹、河谷草甸与雪山湖泊。
+          这是一条景观密度极高、但对体能与高反管理要求也更高的徒步线。
+        </p>
+        <div class="hero-chips">
+          <span>推荐天数：5-7 天</span>
+          <span>最高海拔：约 5,200m</span>
+          <span>体能强度：中高</span>
+          <span>最佳季节：5-6 月 / 9-10 月</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section reveal">
+        <div class="section-head">
+          <h2>路线速览</h2>
+          <p>下面的参数适合用于做出行决策，最终数值会因实际营地、绕行与天气条件出现波动。</p>
+        </div>
+        <div class="grid-2">
+          <article class="card stat">
+            <strong>72-95 km</strong>
+            <span>常见徒步总里程（含机动段）</span>
+            <span class="muted">日均徒步 10-18km，部分垭口日更高</span>
+          </article>
+          <article class="card stat">
+            <strong>+3600m</strong>
+            <span>累计爬升参考</span>
+            <span class="muted">垭口日上升集中，建议预留缓冲天</span>
+          </article>
+          <article class="card stat">
+            <strong>-12°C ~ 15°C</strong>
+            <span>昼夜体感温差</span>
+            <span class="muted">高海拔夜间常低于冰点，需重视保暖</span>
+          </article>
+          <article class="card stat">
+            <strong>4/5</strong>
+            <span>风景震撼指数</span>
+            <span class="muted">雪峰倒影、冰舌地貌、星空与晨昏光线都很出片</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <div class="section-head">
+          <h2>推荐行程（6 天版）</h2>
+          <p>以下是较稳妥的节奏示例，适合第一次接触 5000m 级别垭口的徒步者。</p>
+        </div>
+        <div class="card timeline">
+          <article class="step">
+            <h3>D1 抵达洛扎 - 适应海拔</h3>
+            <p>入住后轻量活动，控制运动量，补水与早睡是当天重点。</p>
+          </article>
+          <article class="step">
+            <h3>D2 机动转运至徒步起点 - 入谷营地</h3>
+            <p>行走路况整体温和，重点检查负重系统与行进节奏。</p>
+          </article>
+          <article class="step">
+            <h3>D3 河谷深入 - 冰川观景营地</h3>
+            <p>海拔逐步抬升，下午风大，建议在 16:00 前完成扎营。</p>
+          </article>
+          <article class="step">
+            <h3>D4 垭口日（全程核心）</h3>
+            <p>早出发、慢频率、短补给循环；翻越垭口后尽快下撤到更低海拔。</p>
+          </article>
+          <article class="step">
+            <h3>D5 湖泊与草甸段 - 回撤主线路</h3>
+            <p>景观密度高，摄影机位丰富，但仍需控制停留时间避免失温。</p>
+          </article>
+          <article class="step">
+            <h3>D6 结束徒步 - 返回县城</h3>
+            <p>完成全线后做基础恢复，记录心率、睡眠与高反情况供复盘。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <div class="section-head">
+          <h2>实拍氛围（示意图）</h2>
+          <p>可替换为你们队伍的实拍图，当前使用高山徒步风格图库作视觉占位。</p>
+        </div>
+        <div class="gallery">
+          <figure class="shot big">
+            <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=80" alt="雪山云海" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80" alt="高山湖泊" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=900&q=80" alt="山谷草甸" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=900&q=80" alt="徒步营地" loading="lazy" />
+          </figure>
+          <figure class="shot">
+            <img src="https://images.unsplash.com/photo-1519904981063-b0cf448d479e?auto=format&fit=crop&w=900&q=80" alt="山脊晨光" loading="lazy" />
+          </figure>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <div class="grid-2">
+          <article class="card">
+            <h2>装备清单（核心）</h2>
+            <ul class="equip-list">
+              <li>中帮防水徒步鞋 + 备用鞋垫</li>
+              <li>40-55L 背包 + 防雨罩</li>
+              <li>冲锋衣裤（硬壳）</li>
+              <li>抓绒中层 + 轻量羽绒</li>
+              <li>排汗底层 2 套</li>
+              <li>-10°C 级睡袋</li>
+              <li>登山杖（双杖）</li>
+              <li>太阳镜（UV400）</li>
+              <li>防晒霜 / 润唇膏</li>
+              <li>头灯 + 备用电池</li>
+              <li>常用药 + 抗高反方案</li>
+              <li>净水装备 / 保温杯</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h2>风险与注意事项</h2>
+            <div class="tips">
+              <div class="tip">
+                <h3>高反管理</h3>
+                <p>遵循“慢上快下”，出现持续头痛、恶心、步态异常应立即下撤。</p>
+              </div>
+              <div class="tip">
+                <h3>天气窗口</h3>
+                <p>午后对流强，雷雨与大风突发概率高，垭口日务必早出发。</p>
+              </div>
+              <div class="tip">
+                <h3>团队节奏</h3>
+                <p>控制队伍拉扯距离，约定无线电或手台沟通节点，避免单独掉队。</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="reveal">
+      <p>说明：本页为徒步线路介绍模板，实际行程请以当地政策、向导评估与实时天气为准。</p>
+    </footer>
+
+    <script>
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in');
+            }
+          });
+        },
+        { threshold: 0.16 }
+      );
+
+      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+      const scrollLine = document.getElementById('scrollLine');
+      const updateScrollLine = () => {
+        const h = document.documentElement;
+        const total = h.scrollHeight - h.clientHeight;
+        const ratio = total > 0 ? (h.scrollTop / total) * 100 : 0;
+        scrollLine.style.width = `${ratio}%`;
+      };
+
+      document.addEventListener('scroll', updateScrollLine, { passive: true });
+      updateScrollLine();
+    </script>
+  </body>
+</html>
