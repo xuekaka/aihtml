@@ -206,6 +206,44 @@
         margin: 0 0 0.4rem;
       }
 
+      .result-panel {
+        display: none;
+        gap: 0.6rem;
+      }
+
+      .result-panel.show {
+        display: grid;
+      }
+
+      .result-summary {
+        padding: 0.52rem 0.65rem;
+        border: 1px solid #d9cfc1;
+        border-radius: 10px;
+        background: #fff;
+        font-weight: 700;
+      }
+
+      .round-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border: 1px solid #d9cfc1;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .round-table th,
+      .round-table td {
+        border-bottom: 1px solid #ece3d7;
+        padding: 0.45rem 0.5rem;
+        text-align: left;
+        font-size: 0.93rem;
+      }
+
+      .round-table tr:last-child td {
+        border-bottom: none;
+      }
+
       .ok {
         color: var(--ok);
       }
@@ -284,6 +322,22 @@
           <div class="log" id="log"></div>
         </article>
       </section>
+
+      <section class="card result-panel" id="resultPanel">
+        <h2>对局结束面板</h2>
+        <div class="result-summary" id="resultSummary">比赛结束后会显示结果</div>
+        <table class="round-table">
+          <thead>
+            <tr>
+              <th>回合</th>
+              <th>玩家A出拳</th>
+              <th>玩家B出拳</th>
+              <th>该局结果</th>
+            </tr>
+          </thead>
+          <tbody id="roundResultBody"></tbody>
+        </table>
+      </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -307,6 +361,9 @@
       const scoreBox = document.getElementById("scoreBox");
       const roundText = document.getElementById("roundText");
       const logBox = document.getElementById("log");
+      const resultPanel = document.getElementById("resultPanel");
+      const resultSummary = document.getElementById("resultSummary");
+      const roundResultBody = document.getElementById("roundResultBody");
       const rematchBtn = document.getElementById("rematchBtn");
       const pickBtns = Array.from(document.querySelectorAll(".pick-btn"));
 
@@ -483,10 +540,45 @@
         rematchBtn.disabled = !(gameState.phase === "finished" && playerInMatch());
       }
 
+      function renderResultPanel() {
+        if (!gameState || gameState.phase !== "finished") {
+          resultPanel.classList.remove("show");
+          roundResultBody.innerHTML = "";
+          return;
+        }
+
+        const [p1, p2] = gameState.players;
+        const nameA = getDisplayName(p1);
+        const nameB = getDisplayName(p2);
+
+        if (gameState.winner === "draw") {
+          resultSummary.textContent = `最终结果：${nameA} 与 ${nameB} 平局`;
+        } else {
+          resultSummary.textContent = `最终结果：${getDisplayName(gameState.winner)} 获胜`;
+        }
+
+        roundResultBody.innerHTML = gameState.history
+          .map((h) => {
+            let winnerText = "平局";
+            if (h.result === "a") winnerText = `${nameA} 胜`;
+            if (h.result === "b") winnerText = `${nameB} 胜`;
+            return `<tr>
+              <td>第 ${h.round} 局</td>
+              <td>${moveText(h.m1)}</td>
+              <td>${moveText(h.m2)}</td>
+              <td>${winnerText}</td>
+            </tr>`;
+          })
+          .join("");
+
+        resultPanel.classList.add("show");
+      }
+
       function renderAll() {
         renderPlayers();
         renderScore();
         renderPhase();
+        renderResultPanel();
       }
 
       async function broadcastState() {
@@ -510,6 +602,8 @@
           rematchVotes = new Set();
           resetLocalRoundMark();
           addLog("双方到齐，比赛开始。", "ok");
+          // Host must refresh its own UI immediately; self-broadcast is ignored.
+          renderAll();
           broadcastState();
         }
       }
@@ -550,6 +644,7 @@
           result,
           summary,
         });
+        addLog(summary, result === "draw" ? "warn" : "ok");
 
         const s1 = gameState.scores[p1];
         const s2 = gameState.scores[p2];
@@ -567,6 +662,7 @@
 
         pendingPicks = {};
         rematchVotes = new Set();
+        renderAll();
         await broadcastState();
 
         if (gameState.phase === "finished") {
@@ -589,6 +685,7 @@
         rematchVotes = new Set();
         resetLocalRoundMark();
         addLog("双方同意，再来一局已开始。", "ok");
+        renderAll();
         await broadcastState();
       }
 

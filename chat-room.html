@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>双人聊天房间</title>
+    <style>
+      :root {
+        --bg-a: #f2f5fb;
+        --bg-b: #e8efe5;
+        --ink: #25323a;
+        --muted: #60707d;
+        --panel: #ffffff;
+        --line: #dbe3ea;
+        --mine: #caebff;
+        --theirs: #ffffff;
+        --accent: #2a86d1;
+        --danger: #c45252;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 14% 8%, #fff 0%, transparent 30%),
+          radial-gradient(circle at 85% 12%, #fff8e5 0%, transparent 24%),
+          linear-gradient(150deg, var(--bg-a) 0%, var(--bg-b) 100%);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+      }
+
+      .shell {
+        width: min(980px, 96vw);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 14px 32px rgba(24, 42, 58, 0.16);
+        overflow: hidden;
+      }
+
+      .login {
+        padding: 1.2rem;
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .login h1 {
+        margin: 0;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+      }
+
+      .hint {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .row {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+      }
+
+      input,
+      button {
+        font: inherit;
+      }
+
+      input {
+        border: 1px solid #cfd7df;
+        border-radius: 10px;
+        padding: 0.56rem 0.7rem;
+        min-width: 240px;
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.56rem 1rem;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(140deg, #4aa2e7 0%, #2f80c6 100%);
+        font-weight: 700;
+      }
+
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .error {
+        color: var(--danger);
+        font-weight: 700;
+        min-height: 1.2rem;
+      }
+
+      .chat {
+        display: none;
+        grid-template-rows: auto 1fr auto;
+        height: min(84vh, 760px);
+      }
+
+      .chat.show {
+        display: grid;
+      }
+
+      .topbar {
+        border-bottom: 1px solid var(--line);
+        background: #f8fbff;
+        padding: 0.8rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .topbar strong {
+        font-size: 1.05rem;
+      }
+
+      .status {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .msgs {
+        padding: 0.9rem;
+        overflow: auto;
+        background:
+          linear-gradient(180deg, #f3f8ff 0%, #f9fbfd 100%);
+      }
+
+      .msg {
+        display: grid;
+        gap: 0.2rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .msg.mine {
+        justify-items: end;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+
+      .bubble {
+        max-width: min(76%, 580px);
+        padding: 0.5rem 0.65rem;
+        border-radius: 12px;
+        border: 1px solid #d5dfeb;
+        background: var(--theirs);
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .msg.mine .bubble {
+        background: var(--mine);
+        border-color: #a8d8f7;
+      }
+
+      .composer {
+        border-top: 1px solid var(--line);
+        padding: 0.7rem;
+        display: flex;
+        gap: 0.6rem;
+        background: #fbfdff;
+      }
+
+      .composer input {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .mini {
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+
+      .back {
+        color: #2f66a6;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      @media (max-width: 680px) {
+        .bubble {
+          max-width: 90%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="login" id="loginPanel">
+        <h1>双人聊天房间</h1>
+        <p class="hint">请输入账号登录（仅支持：白白 / 飞飞）。无密码。</p>
+        <div class="row">
+          <input id="accountInput" maxlength="2" placeholder="请输入账号" />
+          <button class="btn" id="loginBtn">进入房间</button>
+          <a class="back" href="./index.html">返回首页</a>
+        </div>
+        <div class="error" id="loginError"></div>
+        <div class="mini">登录后会自动读取最近 100 条记录，并实时同步双方消息。</div>
+      </section>
+
+      <section class="chat" id="chatPanel">
+        <header class="topbar">
+          <div>
+            <strong>聊天房间</strong>
+            <div class="mini">账号：<span id="meText"></span></div>
+          </div>
+          <div class="status" id="statusText">连接中...</div>
+        </header>
+
+        <section class="msgs" id="msgs"></section>
+
+        <footer class="composer">
+          <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
+          <button class="btn" id="sendBtn">发送</button>
+        </footer>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = "https://hdzeqsijrntnbdqdqyai.supabase.co";
+      const SUPABASE_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkemVxc2lqcm50bmJkcWRxeWFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjUyMzMsImV4cCI6MjA4Nzk0MTIzM30.4Cd4h4XEdDZUvpQU6rlM08cEU8cZ5wqW3J_oYfxJVqk";
+
+      const ALLOWED_ACCOUNTS = new Set(["白白", "飞飞"]);
+      const TABLE_NAME = "chat_messages";
+
+      const loginPanel = document.getElementById("loginPanel");
+      const chatPanel = document.getElementById("chatPanel");
+      const accountInput = document.getElementById("accountInput");
+      const loginBtn = document.getElementById("loginBtn");
+      const loginError = document.getElementById("loginError");
+      const statusText = document.getElementById("statusText");
+      const meText = document.getElementById("meText");
+      const msgs = document.getElementById("msgs");
+      const msgInput = document.getElementById("msgInput");
+      const sendBtn = document.getElementById("sendBtn");
+
+      const supabaseGlobal = window.supabase;
+      const sbClient =
+        supabaseGlobal && typeof supabaseGlobal.createClient === "function"
+          ? supabaseGlobal.createClient(SUPABASE_URL, SUPABASE_KEY)
+          : null;
+
+      let me = "";
+      let channel = null;
+      const seenIds = new Set();
+
+      function fmtTime(ts) {
+        const d = new Date(ts);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleString();
+      }
+
+      function setStatus(text) {
+        statusText.textContent = text;
+      }
+
+      function setError(text) {
+        loginError.textContent = text || "";
+      }
+
+      function appendMessage(row) {
+        if (!row || !row.id) return;
+        if (seenIds.has(row.id)) return;
+        seenIds.add(row.id);
+
+        const item = document.createElement("article");
+        item.className = `msg ${row.sender === me ? "mine" : ""}`;
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `${row.sender} · ${fmtTime(row.created_at)}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = row.content;
+
+        item.append(meta, bubble);
+        msgs.appendChild(item);
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+
+      function resetMessages() {
+        seenIds.clear();
+        msgs.innerHTML = "";
+      }
+
+      async function loadRecent() {
+        setStatus("正在读取最近100条记录...");
+        const { data, error } = await sbClient
+          .from(TABLE_NAME)
+          .select("id,sender,content,created_at")
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        if (error) {
+          setStatus("读取历史失败");
+          setError(`读取历史失败：${error.message}`);
+          return;
+        }
+
+        resetMessages();
+        data.reverse().forEach(appendMessage);
+        setStatus("已连接，实时同步中");
+      }
+
+      async function sendMessage() {
+        const content = (msgInput.value || "").trim();
+        if (!content) return;
+        if (!me) return;
+
+        sendBtn.disabled = true;
+        const { error } = await sbClient.from(TABLE_NAME).insert({
+          sender: me,
+          content,
+        });
+        sendBtn.disabled = false;
+
+        if (error) {
+          setStatus("发送失败");
+          alert(`发送失败：${error.message}`);
+          return;
+        }
+
+        msgInput.value = "";
+        msgInput.focus();
+      }
+
+      async function subscribeRealtime() {
+        if (channel) {
+          await sbClient.removeChannel(channel);
+        }
+
+        channel = sbClient
+          .channel("chat-room-realtime")
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: TABLE_NAME },
+            (payload) => {
+              appendMessage(payload.new);
+              setStatus("已连接，实时同步中");
+            }
+          );
+
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            setStatus("已连接，实时同步中");
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setStatus("实时连接异常");
+          }
+        });
+      }
+
+      async function doLogin() {
+        const account = (accountInput.value || "").trim();
+        if (!ALLOWED_ACCOUNTS.has(account)) {
+          setError("登录失败：账号只能是“白白”或“飞飞”。");
+          return;
+        }
+
+        if (!sbClient) {
+          setError("登录失败：Supabase SDK 加载失败，请刷新重试。");
+          return;
+        }
+
+        me = account;
+        setError("");
+        meText.textContent = me;
+        loginPanel.style.display = "none";
+        chatPanel.classList.add("show");
+
+        await loadRecent();
+        await subscribeRealtime();
+      }
+
+      loginBtn.addEventListener("click", doLogin);
+      accountInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doLogin();
+      });
+
+      sendBtn.addEventListener("click", sendMessage);
+      msgInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>
