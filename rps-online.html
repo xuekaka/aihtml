@@ -314,7 +314,7 @@
         (window.crypto && window.crypto.randomUUID && window.crypto.randomUUID()) ||
         `cid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const supabaseGlobal = window.supabase;
-      const supabase =
+      const sbClient =
         supabaseGlobal && typeof supabaseGlobal.createClient === "function"
           ? supabaseGlobal.createClient(SUPABASE_URL, SUPABASE_KEY)
           : null;
@@ -615,7 +615,7 @@
       }
 
       async function joinRoom(code, displayName) {
-        if (!supabase) {
+        if (!sbClient) {
           addLog("Supabase SDK 加载失败（可能是 CDN 被拦截）。请开代理后刷新再试。", "warn");
           return;
         }
@@ -626,10 +626,10 @@
 
         try {
           if (channel) {
-            await supabase.removeChannel(channel);
+            await sbClient.removeChannel(channel);
           }
 
-          channel = supabase.channel(`rps-room-${roomCode}`, {
+          channel = sbClient.channel(`rps-room-${roomCode}`, {
             config: {
               broadcast: { self: true },
               presence: { key: myClientId },
@@ -767,7 +767,7 @@
       const preRoom = normalizeRoom(params.get("room"));
       if (preRoom) roomInput.value = preRoom;
 
-      if (!supabase) {
+      if (!sbClient) {
         setLobbyDisabled(true);
         addLog("Supabase SDK 未成功加载，房间功能已禁用。", "warn");
       }
