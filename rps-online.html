@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online RPS - 双人联网猜拳</title>
+    <style>
+      :root {
+        --bg-a: #f8efe3;
+        --bg-b: #e6f0ff;
+        --ink: #263238;
+        --panel: #fffdf8e8;
+        --line: #d8cfc2;
+        --accent: #e06737;
+        --ok: #1f8f57;
+        --warn: #b65a29;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 16% 10%, #fff 0%, transparent 30%),
+          radial-gradient(circle at 86% 12%, #fff6da 0%, transparent 26%),
+          linear-gradient(155deg, var(--bg-a) 0%, var(--bg-b) 100%);
+        padding: 1rem;
+      }
+
+      .wrap {
+        width: min(980px, 96vw);
+        margin: 0 auto;
+        display: grid;
+        gap: 0.85rem;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 0.9rem;
+        box-shadow: 0 8px 24px rgba(42, 38, 32, 0.12);
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+      }
+
+      .muted {
+        color: #5b6571;
+      }
+
+      .room-form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.6rem;
+        align-items: end;
+      }
+
+      .field {
+        display: grid;
+        gap: 0.3rem;
+      }
+
+      .field label {
+        font-size: 0.88rem;
+        color: #5b6571;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid #cfc4b4;
+        border-radius: 10px;
+        padding: 0.52rem 0.62rem;
+        font: inherit;
+        background: #fff;
+      }
+
+      .btn,
+      .pick-btn {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.55rem 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .btn {
+        color: #fff;
+        background: linear-gradient(140deg, #ef8551 0%, #db5f2f 100%);
+      }
+
+      .btn.secondary {
+        color: #34424c;
+        background: #fff;
+        border: 1px solid #d9cdbd;
+      }
+
+      .btn:disabled,
+      .pick-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .chip {
+        padding: 0.32rem 0.64rem;
+        border-radius: 999px;
+        border: 1px solid #d8ccbd;
+        background: #fff;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.85rem;
+      }
+
+      .players {
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .player-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.62rem;
+        border: 1px solid #d9cfc1;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .host-tag {
+        font-size: 0.75rem;
+        color: #fff;
+        background: #3a8adf;
+        border-radius: 999px;
+        padding: 0.1rem 0.42rem;
+      }
+
+      .score {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      .score-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.48rem 0.6rem;
+        background: #fff;
+        border: 1px solid #dccfbe;
+        border-radius: 10px;
+      }
+
+      .arena {
+        display: grid;
+        gap: 0.62rem;
+      }
+
+      .pick-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      .pick-btn {
+        background: #fff;
+        border: 1px solid #dbcdbd;
+      }
+
+      .pick-btn.selected {
+        border-color: #cb5f30;
+        box-shadow: 0 0 0 2px #f4d2bd;
+      }
+
+      .log {
+        min-height: 120px;
+        max-height: 250px;
+        overflow: auto;
+        border: 1px solid #d9cfc1;
+        border-radius: 10px;
+        background: #fff;
+        padding: 0.55rem;
+      }
+
+      .log p {
+        margin: 0 0 0.4rem;
+      }
+
+      .ok {
+        color: var(--ok);
+      }
+
+      .warn {
+        color: var(--warn);
+      }
+
+      a.back {
+        color: #2e5f95;
+        font-weight: 700;
+      }
+
+      @media (max-width: 840px) {
+        .room-form {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .room-form {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>联网猜拳（双人房间制）</h1>
+        <p class="muted">规则：三局两胜。两名玩家在同一房间在线出拳，支持“再来一局”。</p>
+        <p><a class="back" href="./index.html">返回首页</a></p>
+      </section>
+
+      <section class="card">
+        <div class="room-form">
+          <div class="field">
+            <label for="nameInput">你的昵称</label>
+            <input id="nameInput" maxlength="16" placeholder="例如：小明" />
+          </div>
+          <div class="field">
+            <label for="roomInput">房间号</label>
+            <input id="roomInput" maxlength="12" placeholder="例如：A1B2C3" />
+          </div>
+          <button class="btn" id="createBtn">创建房间</button>
+          <button class="btn secondary" id="joinBtn">加入房间</button>
+        </div>
+      </section>
+
+      <section class="card status-row">
+        <span class="chip">当前房间：<strong id="roomText">未加入</strong></span>
+        <span class="chip">在线人数：<strong id="onlineText">0 / 2</strong></span>
+        <span class="chip">阶段：<strong id="phaseText">等待中</strong></span>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>玩家与比分</h2>
+          <div class="players" id="playersList"></div>
+          <div class="score" id="scoreBox"></div>
+        </article>
+
+        <article class="card arena">
+          <h2>对局区</h2>
+          <div id="roundText">第 1 局 / 最多 3 局</div>
+          <div class="pick-row">
+            <button class="pick-btn" data-move="rock">石头 ✊</button>
+            <button class="pick-btn" data-move="paper">布 ✋</button>
+            <button class="pick-btn" data-move="scissors">剪刀 ✌️</button>
+          </div>
+          <button class="btn secondary" id="rematchBtn" disabled>再来一局</button>
+          <div class="log" id="log"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = "https://hdzeqsijrntnbdqdqyai.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_T12X30Fcx5stbhd5r6OFuA_pn90oSbg";
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      const BEST_OF = 3;
+      const NEED_WINS = 2;
+
+      const nameInput = document.getElementById("nameInput");
+      const roomInput = document.getElementById("roomInput");
+      const createBtn = document.getElementById("createBtn");
+      const joinBtn = document.getElementById("joinBtn");
+      const roomText = document.getElementById("roomText");
+      const onlineText = document.getElementById("onlineText");
+      const phaseText = document.getElementById("phaseText");
+      const playersList = document.getElementById("playersList");
+      const scoreBox = document.getElementById("scoreBox");
+      const roundText = document.getElementById("roundText");
+      const logBox = document.getElementById("log");
+      const rematchBtn = document.getElementById("rematchBtn");
+      const pickBtns = Array.from(document.querySelectorAll(".pick-btn"));
+
+      const myClientId = crypto.randomUUID();
+      let myName = "";
+      let roomCode = "";
+      let channel = null;
+
+      let members = [];
+      let hostId = "";
+      let isHost = false;
+
+      let gameState = null;
+      let pendingPicks = {};
+      let rematchVotes = new Set();
+      let myLastPick = null;
+
+      function addLog(message, cls = "") {
+        const p = document.createElement("p");
+        if (cls) p.className = cls;
+        p.textContent = `${new Date().toLocaleTimeString()} ${message}`;
+        logBox.prepend(p);
+      }
+
+      function normalizeRoom(raw) {
+        return (raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+      }
+
+      function randomRoomCode() {
+        return Math.random().toString(36).slice(2, 8).toUpperCase();
+      }
+
+      function moveText(move) {
+        if (move === "rock") return "石头✊";
+        if (move === "paper") return "布✋";
+        return "剪刀✌️";
+      }
+
+      function winnerFor(a, b) {
+        if (a === b) return "draw";
+        if ((a === "rock" && b === "scissors") || (a === "paper" && b === "rock") || (a === "scissors" && b === "paper")) {
+          return "a";
+        }
+        return "b";
+      }
+
+      function currentPair() {
+        const sorted = [...members].sort((x, y) => x.joinedAt - y.joinedAt);
+        if (sorted.length < 2) return { a: null, b: null };
+        return { a: sorted[0], b: sorted[1] };
+      }
+
+      function getDisplayName(id) {
+        const target = members.find((m) => m.clientId === id);
+        return target ? target.name : id.slice(0, 6);
+      }
+
+      function playerInMatch() {
+        const { a, b } = currentPair();
+        return a && b && (myClientId === a.clientId || myClientId === b.clientId);
+      }
+
+      function resetLocalRoundMark() {
+        myLastPick = null;
+        pickBtns.forEach((btn) => btn.classList.remove("selected"));
+      }
+
+      function buildInitialState() {
+        const { a, b } = currentPair();
+        if (!a || !b) return null;
+        return {
+          round: 1,
+          phase: "picking",
+          players: [a.clientId, b.clientId],
+          scores: {
+            [a.clientId]: 0,
+            [b.clientId]: 0,
+          },
+          submitted: {
+            [a.clientId]: false,
+            [b.clientId]: false,
+          },
+          history: [],
+          winner: null,
+        };
+      }
+
+      function refreshHostAndMembers() {
+        const state = channel.presenceState();
+        const flat = [];
+        Object.values(state).forEach((arr) => {
+          arr.forEach((item) => flat.push(item));
+        });
+        members = flat
+          .map((x) => ({
+            clientId: x.clientId,
+            name: x.name,
+            joinedAt: x.joinedAt,
+          }))
+          .sort((a, b) => a.joinedAt - b.joinedAt);
+
+        hostId = members.length ? members[0].clientId : "";
+        isHost = hostId === myClientId;
+
+        const humanCount = Math.min(members.length, 2);
+        onlineText.textContent = `${humanCount} / 2`;
+      }
+
+      function renderPlayers() {
+        playersList.innerHTML = "";
+        if (!members.length) {
+          playersList.textContent = "暂无玩家";
+          return;
+        }
+
+        members.slice(0, 2).forEach((m) => {
+          const row = document.createElement("div");
+          row.className = "player-line";
+          const left = document.createElement("span");
+          left.textContent = `${m.name}${m.clientId === myClientId ? "（你）" : ""}`;
+          const right = document.createElement("span");
+          if (m.clientId === hostId) {
+            right.className = "host-tag";
+            right.textContent = "房主";
+          }
+          row.append(left, right);
+          playersList.appendChild(row);
+        });
+      }
+
+      function renderScore() {
+        scoreBox.innerHTML = "";
+        if (!gameState) {
+          scoreBox.textContent = "等待两名玩家进入后开始";
+          return;
+        }
+
+        gameState.players.forEach((id) => {
+          const row = document.createElement("div");
+          row.className = "score-line";
+          row.innerHTML = `<span>${getDisplayName(id)}</span><strong>${gameState.scores[id] || 0}</strong>`;
+          scoreBox.appendChild(row);
+        });
+      }
+
+      function renderPhase() {
+        if (!gameState) {
+          phaseText.textContent = "等待中";
+          roundText.textContent = `第 1 局 / 最多 ${BEST_OF} 局`;
+          rematchBtn.disabled = true;
+          pickBtns.forEach((btn) => (btn.disabled = true));
+          return;
+        }
+
+        const canPick = gameState.phase === "picking" && playerInMatch() && !(gameState.submitted[myClientId]);
+        pickBtns.forEach((btn) => (btn.disabled = !canPick));
+
+        if (gameState.phase === "picking") phaseText.textContent = "出拳中";
+        if (gameState.phase === "finished") phaseText.textContent = "本局已结束";
+
+        roundText.textContent = `第 ${gameState.round} 局 / 最多 ${BEST_OF} 局`;
+        rematchBtn.disabled = !(gameState.phase === "finished" && playerInMatch());
+      }
+
+      function renderAll() {
+        renderPlayers();
+        renderScore();
+        renderPhase();
+      }
+
+      async function broadcastState() {
+        if (!channel || !gameState) return;
+        await channel.send({
+          type: "broadcast",
+          event: "state",
+          payload: { gameState, from: myClientId },
+        });
+      }
+
+      function maybeStartGame() {
+        if (!isHost) return;
+        const pair = currentPair();
+        if (!pair.a || !pair.b) return;
+        if (members.length > 2) return;
+
+        if (!gameState || gameState.players.some((id) => ![pair.a.clientId, pair.b.clientId].includes(id))) {
+          gameState = buildInitialState();
+          pendingPicks = {};
+          rematchVotes = new Set();
+          resetLocalRoundMark();
+          addLog("双方到齐，比赛开始。", "ok");
+          broadcastState();
+        }
+      }
+
+      async function handlePick(payload) {
+        if (!isHost || !gameState || gameState.phase !== "picking") return;
+        const { playerId, move, round } = payload;
+        if (round !== gameState.round) return;
+        if (!gameState.players.includes(playerId)) return;
+        if (pendingPicks[playerId]) return;
+
+        pendingPicks[playerId] = move;
+        gameState.submitted[playerId] = true;
+        await broadcastState();
+
+        const [p1, p2] = gameState.players;
+        if (!pendingPicks[p1] || !pendingPicks[p2]) return;
+
+        const result = winnerFor(pendingPicks[p1], pendingPicks[p2]);
+        let summary = "";
+
+        if (result === "draw") {
+          summary = `第 ${gameState.round} 局平局：${moveText(pendingPicks[p1])} vs ${moveText(pendingPicks[p2])}`;
+        } else if (result === "a") {
+          gameState.scores[p1] += 1;
+          summary = `第 ${gameState.round} 局 ${getDisplayName(p1)} 胜：${moveText(pendingPicks[p1])} vs ${moveText(pendingPicks[p2])}`;
+        } else {
+          gameState.scores[p2] += 1;
+          summary = `第 ${gameState.round} 局 ${getDisplayName(p2)} 胜：${moveText(pendingPicks[p2])} vs ${moveText(pendingPicks[p1])}`;
+        }
+
+        gameState.history.push({
+          round: gameState.round,
+          p1,
+          p2,
+          m1: pendingPicks[p1],
+          m2: pendingPicks[p2],
+          result,
+          summary,
+        });
+
+        const s1 = gameState.scores[p1];
+        const s2 = gameState.scores[p2];
+        if (s1 >= NEED_WINS || s2 >= NEED_WINS || gameState.round >= BEST_OF) {
+          gameState.phase = "finished";
+          if (s1 === s2) gameState.winner = "draw";
+          else gameState.winner = s1 > s2 ? p1 : p2;
+        } else {
+          gameState.round += 1;
+          gameState.submitted = {
+            [p1]: false,
+            [p2]: false,
+          };
+        }
+
+        pendingPicks = {};
+        rematchVotes = new Set();
+        await broadcastState();
+
+        if (gameState.phase === "finished") {
+          if (gameState.winner === "draw") addLog("三局结束：平局。", "warn");
+          else addLog(`比赛结束：${getDisplayName(gameState.winner)} 获胜。`, "ok");
+        }
+      }
+
+      async function handleRematchVote(payload) {
+        if (!isHost || !gameState || gameState.phase !== "finished") return;
+        const { playerId } = payload;
+        if (!gameState.players.includes(playerId)) return;
+        rematchVotes.add(playerId);
+
+        const ready = gameState.players.every((id) => rematchVotes.has(id));
+        if (!ready) return;
+
+        gameState = buildInitialState();
+        pendingPicks = {};
+        rematchVotes = new Set();
+        resetLocalRoundMark();
+        addLog("双方同意，再来一局已开始。", "ok");
+        await broadcastState();
+      }
+
+      function syncStateFromRemote(state) {
+        gameState = state;
+        resetLocalRoundMark();
+
+        if (gameState.history.length) {
+          const latest = gameState.history[gameState.history.length - 1];
+          if (!logBox.firstChild || !logBox.firstChild.textContent.includes(latest.summary)) {
+            addLog(latest.summary, latest.result === "draw" ? "warn" : "ok");
+          }
+        }
+
+        if (gameState.phase === "finished") {
+          if (gameState.winner === "draw") {
+            addLog("本场三局结束，平局。可点击“再来一局”。", "warn");
+          } else {
+            addLog(`本场胜者：${getDisplayName(gameState.winner)}。可点击“再来一局”。`, "ok");
+          }
+        }
+
+        renderAll();
+      }
+
+      async function joinRoom(code, displayName) {
+        roomCode = code;
+        myName = displayName;
+        roomText.textContent = roomCode;
+
+        if (channel) {
+          await supabase.removeChannel(channel);
+        }
+
+        channel = supabase.channel(`rps-room-${roomCode}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: myClientId },
+          },
+        });
+
+        channel
+          .on("presence", { event: "sync" }, async () => {
+            refreshHostAndMembers();
+            renderAll();
+
+            if (members.length > 2) {
+              addLog("当前房间已满（最多 2 人）。请换一个房间号。", "warn");
+              return;
+            }
+
+            if (isHost) {
+              maybeStartGame();
+              if (gameState) {
+                await broadcastState();
+              }
+            }
+          })
+          .on("broadcast", { event: "state" }, ({ payload }) => {
+            if (!payload || payload.from === myClientId) return;
+            syncStateFromRemote(payload.gameState);
+          })
+          .on("broadcast", { event: "pick" }, ({ payload }) => {
+            handlePick(payload);
+          })
+          .on("broadcast", { event: "rematch_vote" }, ({ payload }) => {
+            handleRematchVote(payload);
+          });
+
+        channel.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel.track({
+              clientId: myClientId,
+              name: myName,
+              joinedAt: Date.now(),
+            });
+            addLog(`已加入房间 ${roomCode}`);
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            addLog("连接房间失败，请检查 Supabase Realtime 是否启用。", "warn");
+          }
+        });
+      }
+
+      async function emitPick(move) {
+        if (!channel || !gameState || gameState.phase !== "picking") return;
+        if (!gameState.players.includes(myClientId)) return;
+        if (gameState.submitted[myClientId]) return;
+
+        myLastPick = move;
+        pickBtns.forEach((btn) => btn.classList.toggle("selected", btn.dataset.move === move));
+
+        await channel.send({
+          type: "broadcast",
+          event: "pick",
+          payload: {
+            playerId: myClientId,
+            move,
+            round: gameState.round,
+          },
+        });
+
+        addLog(`你已出拳：${moveText(move)}（等待对手）`);
+      }
+
+      async function voteRematch() {
+        if (!channel || !gameState || gameState.phase !== "finished") return;
+        await channel.send({
+          type: "broadcast",
+          event: "rematch_vote",
+          payload: {
+            playerId: myClientId,
+          },
+        });
+        addLog("你请求了“再来一局”，等待对手确认。", "ok");
+      }
+
+      function validateInput() {
+        const name = (nameInput.value || "").trim().slice(0, 16);
+        if (!name) {
+          addLog("请先输入昵称。", "warn");
+          return null;
+        }
+        return name;
+      }
+
+      createBtn.addEventListener("click", async () => {
+        const name = validateInput();
+        if (!name) return;
+        const code = randomRoomCode();
+        roomInput.value = code;
+        await joinRoom(code, name);
+      });
+
+      joinBtn.addEventListener("click", async () => {
+        const name = validateInput();
+        if (!name) return;
+        const code = normalizeRoom(roomInput.value);
+        if (!code) {
+          addLog("请输入有效房间号。", "warn");
+          return;
+        }
+        roomInput.value = code;
+        await joinRoom(code, name);
+      });
+
+      pickBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          emitPick(btn.dataset.move);
+        });
+      });
+
+      rematchBtn.addEventListener("click", voteRematch);
+
+      const params = new URLSearchParams(location.search);
+      const preRoom = normalizeRoom(params.get("room"));
+      if (preRoom) roomInput.value = preRoom;
+
+      renderAll();
+      addLog("准备就绪：输入昵称后创建房间，或输入房间号加入。", "ok");
+    </script>
+  </body>
+</html>

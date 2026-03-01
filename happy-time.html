@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Happy Time - 库拉岗日打怪地图</title>
+    <style>
+      :root {
+        --bg1: #ecf7ff;
+        --bg2: #d6f0e0;
+        --ink: #20303a;
+        --panel: #ffffffcc;
+        --line: #b8d3df;
+        --hero: #2e89ff;
+        --mob: #f58a4b;
+        --boss: #d63f59;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 18% 8%, #ffffff 0%, transparent 28%),
+          radial-gradient(circle at 88% 12%, #fff6cc 0%, transparent 24%),
+          linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+      }
+
+      .game-wrap {
+        width: min(1050px, 96vw);
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .hud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--panel);
+        border: 2px solid #fff;
+        box-shadow: 0 10px 26px rgba(28, 44, 54, 0.14);
+        border-radius: 16px;
+        padding: 0.75rem 0.95rem;
+      }
+
+      .chip {
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        font-weight: 700;
+      }
+
+      .stage {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        min-height: 420px;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 2px solid #fff;
+        box-shadow: 0 14px 36px rgba(29, 39, 49, 0.2);
+        background:
+          linear-gradient(180deg, #a4e4ff 0%, #b4edc8 45%, #9ddb8a 45%, #82c878 100%);
+      }
+
+      .terrain {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .tile {
+        position: absolute;
+        width: calc(100% / 12);
+        height: calc(100% / 8);
+        left: calc(var(--x) * (100% / 12));
+        top: calc(var(--y) * (100% / 8));
+      }
+
+      .tile::before {
+        content: "";
+        position: absolute;
+        inset: 11%;
+        border-radius: 10px;
+      }
+
+      .tile.road::before {
+        background: linear-gradient(180deg, #f7e7bf 0%, #e5c88f 100%);
+        border: 1px solid rgba(146, 103, 55, 0.35);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+      }
+
+      .tile.block.rock::before {
+        background:
+          radial-gradient(circle at 40% 36%, #cfd7dd 0%, #adb8c1 55%, #95a1aa 100%);
+        border: 1px solid rgba(76, 90, 101, 0.38);
+      }
+
+      .tile.block.tree::before {
+        background:
+          radial-gradient(circle at 50% 28%, #6ec488 0%, #4ea96c 58%, #2f7c4c 100%);
+        border: 1px solid rgba(29, 94, 59, 0.38);
+      }
+
+      .tile.block.bush::before {
+        background:
+          radial-gradient(circle at 50% 50%, #9fd889 0%, #79be67 58%, #579448 100%);
+        border: 1px solid rgba(57, 105, 46, 0.34);
+      }
+
+      .stage::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+        background-size: calc(100% / 12) calc(100% / 8);
+      }
+
+      .mountains {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.45;
+        background:
+          radial-gradient(70% 55% at 10% 38%, #eef8ff 0%, #d0ecff 46%, transparent 47%),
+          radial-gradient(65% 52% at 52% 34%, #f6fcff 0%, #cbe8f9 45%, transparent 46%),
+          radial-gradient(72% 55% at 94% 36%, #eef8ff 0%, #c8e4f6 45%, transparent 46%);
+      }
+
+      .entity {
+        position: absolute;
+        width: calc(100% / 12);
+        height: calc(100% / 8);
+        left: calc(var(--x) * (100% / 12));
+        top: calc(var(--y) * (100% / 8));
+        transition: left 120ms linear, top 120ms linear, transform 140ms ease;
+        display: grid;
+        place-items: center;
+        z-index: 5;
+      }
+
+      .entity .power {
+        position: absolute;
+        top: 6%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.13rem 0.42rem;
+        font-size: 0.74rem;
+        border-radius: 999px;
+        color: #fff;
+        white-space: nowrap;
+        font-weight: 800;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+      }
+
+      .entity .sprite {
+        width: 70%;
+        height: 70%;
+        border-radius: 12px;
+        border: 2px solid #ffffffb0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        position: relative;
+      }
+
+      .hero .sprite {
+        background: linear-gradient(145deg, #71bbff 0%, var(--hero) 100%);
+      }
+
+      .hero .sprite::before,
+      .hero .sprite::after {
+        content: "";
+        position: absolute;
+        top: 28%;
+        width: 6px;
+        height: 6px;
+        background: #fff;
+        border-radius: 50%;
+      }
+
+      .hero .sprite::before {
+        left: 24%;
+      }
+
+      .hero .sprite::after {
+        right: 24%;
+      }
+
+      .monster .sprite {
+        background: linear-gradient(145deg, #ffc18e 0%, var(--mob) 100%);
+      }
+
+      .boss .sprite {
+        background: linear-gradient(145deg, #ff8ba0 0%, var(--boss) 100%);
+      }
+
+      .hero .power {
+        background: #1f6ed9;
+      }
+
+      .monster .power {
+        background: #c96a31;
+      }
+
+      .boss .power {
+        background: #b72342;
+      }
+
+      .entity.dead {
+        opacity: 0;
+        transform: scale(0.2);
+        transition: transform 240ms ease, opacity 240ms ease;
+        pointer-events: none;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(15, 20, 26, 0.62);
+        z-index: 15;
+      }
+
+      .overlay.show {
+        display: grid;
+      }
+
+      .panel {
+        width: min(520px, 92%);
+        border-radius: 16px;
+        border: 2px solid #fff;
+        background: #fff9f0;
+        padding: 1rem;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      .panel h2 {
+        margin: 0 0 0.5rem;
+      }
+
+      .panel p {
+        margin: 0.3rem 0;
+      }
+
+      .btn {
+        margin-top: 0.6rem;
+        border: 0;
+        border-radius: 999px;
+        padding: 0.5rem 1rem;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(130deg, #f28a4a 0%, #dd6030 100%);
+        cursor: pointer;
+      }
+
+      .hint {
+        background: #ffffffde;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 0.75rem 0.9rem;
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 720px) {
+        .stage {
+          min-height: 360px;
+        }
+
+        .entity .sprite {
+          width: 74%;
+          height: 74%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-wrap">
+      <section class="hud">
+        <span class="chip">主角战斗力：<strong id="heroPowerText">6</strong></span>
+        <span class="chip">剩余怪物：<strong id="leftCount"></strong></span>
+        <span class="chip">目标：按正确顺序成长，击败 Boss</span>
+      </section>
+
+      <section class="stage" id="stage">
+        <div class="mountains" aria-hidden="true"></div>
+        <div class="terrain" id="terrain" aria-hidden="true"></div>
+
+        <div class="entity hero" id="hero" style="--x: 0; --y: 0;">
+          <span class="power" id="heroPowerLabel">6</span>
+          <div class="sprite" aria-label="hero"></div>
+        </div>
+
+        <div class="overlay" id="overlay">
+          <div class="panel">
+            <h2 id="resultTitle"></h2>
+            <p id="resultText"></p>
+            <button class="btn" id="restartBtn">重新开始</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="hint" id="log">操作：方向键 / WASD 移动。沿浅色道路前进，碰到怪物会自动战斗（主角战斗力 >= 怪物战斗力则胜利并吸收战斗力）。</section>
+    </main>
+
+    <script>
+      const COLS = 12;
+      const ROWS = 8;
+      const stage = document.getElementById("stage");
+      const terrain = document.getElementById("terrain");
+      const heroEl = document.getElementById("hero");
+      const heroPowerText = document.getElementById("heroPowerText");
+      const heroPowerLabel = document.getElementById("heroPowerLabel");
+      const leftCount = document.getElementById("leftCount");
+      const log = document.getElementById("log");
+      const overlay = document.getElementById("overlay");
+      const resultTitle = document.getElementById("resultTitle");
+      const resultText = document.getElementById("resultText");
+      const restartBtn = document.getElementById("restartBtn");
+
+      const initialHero = { x: 0, y: 7, power: 6 };
+      const roadPath = [
+        [0, 7], [1, 7], [2, 7], [2, 6], [3, 6], [4, 6], [4, 5],
+        [5, 5], [6, 5], [6, 4], [7, 4], [8, 4], [8, 3], [9, 3],
+        [10, 3], [10, 2], [11, 2], [11, 1], [11, 0],
+      ];
+      const passable = new Set(roadPath.map(([x, y]) => `${x},${y}`));
+      const initialMonsters = [
+        { id: "m1", name: "雪原史莱姆", x: 2, y: 6, power: 3, boss: false },
+        { id: "m2", name: "风牙蝙蝠", x: 4, y: 5, power: 8, boss: false },
+        { id: "m3", name: "冰甲狼", x: 6, y: 4, power: 11, boss: false },
+        { id: "m4", name: "山谷兽人", x: 8, y: 3, power: 20, boss: false },
+        { id: "m5", name: "石脊傀儡", x: 10, y: 3, power: 38, boss: false },
+        { id: "m6", name: "雪峰幼龙", x: 10, y: 2, power: 70, boss: false },
+        { id: "boss", name: "库拉岗日 Boss", x: 11, y: 0, power: 140, boss: true },
+      ];
+
+      let hero = { ...initialHero };
+      let monsters = initialMonsters.map((m) => ({ ...m }));
+      let lock = false;
+      const monsterElements = new Map();
+
+      function gridKey(x, y) {
+        return `${x},${y}`;
+      }
+
+      function renderTerrain() {
+        terrain.innerHTML = "";
+        for (let y = 0; y < ROWS; y += 1) {
+          for (let x = 0; x < COLS; x += 1) {
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            tile.style.setProperty("--x", String(x));
+            tile.style.setProperty("--y", String(y));
+            if (passable.has(gridKey(x, y))) {
+              tile.classList.add("road");
+            } else {
+              const kinds = ["rock", "tree", "bush"];
+              const idx = (x * 7 + y * 11) % kinds.length;
+              tile.classList.add("block", kinds[idx]);
+            }
+            terrain.appendChild(tile);
+          }
+        }
+      }
+
+      function syncHero() {
+        heroEl.style.setProperty("--x", String(hero.x));
+        heroEl.style.setProperty("--y", String(hero.y));
+        heroPowerText.textContent = String(hero.power);
+        heroPowerLabel.textContent = String(hero.power);
+      }
+
+      function setLeftCount() {
+        leftCount.textContent = String(monsters.length);
+      }
+
+      function createMonsters() {
+        monsterElements.forEach((el) => el.remove());
+        monsterElements.clear();
+
+        monsters.forEach((m) => {
+          const wrap = document.createElement("div");
+          wrap.className = `entity ${m.boss ? "boss" : "monster"}`;
+          wrap.dataset.id = m.id;
+          wrap.style.setProperty("--x", String(m.x));
+          wrap.style.setProperty("--y", String(m.y));
+
+          const power = document.createElement("span");
+          power.className = "power";
+          power.textContent = String(m.power);
+
+          const sprite = document.createElement("div");
+          sprite.className = "sprite";
+          sprite.setAttribute("aria-label", m.name);
+
+          wrap.append(power, sprite);
+          stage.appendChild(wrap);
+          monsterElements.set(m.id, wrap);
+        });
+      }
+
+      function showResult(title, text) {
+        lock = true;
+        resultTitle.textContent = title;
+        resultText.textContent = text;
+        overlay.classList.add("show");
+      }
+
+      function battle(monster) {
+        if (hero.power >= monster.power) {
+          hero.power += monster.power;
+          const el = monsterElements.get(monster.id);
+          if (el) {
+            el.classList.add("dead");
+            setTimeout(() => el.remove(), 240);
+          }
+          monsters = monsters.filter((m) => m.id !== monster.id);
+          syncHero();
+          setLeftCount();
+          log.textContent = `你击败了 ${monster.name}（${monster.power}），主角战斗力提升到 ${hero.power}。`;
+
+          if (monster.boss) {
+            showResult("通关胜利", `你成功击败 ${monster.name}！最终战斗力 ${hero.power}。`);
+          }
+          return;
+        }
+
+        log.textContent = `你挑战了 ${monster.name}（${monster.power}），但主角战斗力只有 ${hero.power}。`;
+        showResult("游戏失败", "战斗力不足，路线顺序错了。请重新规划击怪顺序。\n正确成长链：3 -> 8 -> 11 -> 20 -> 38 -> 70 -> 140");
+      }
+
+      function tryFight() {
+        const hit = monsters.find((m) => m.x === hero.x && m.y === hero.y);
+        if (hit) battle(hit);
+      }
+
+      function move(dx, dy) {
+        if (lock) return;
+        const nx = hero.x + dx;
+        const ny = hero.y + dy;
+        if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) return;
+        if (!passable.has(gridKey(nx, ny))) {
+          log.textContent = "前方是障碍地形，沿着浅色道路前进。";
+          return;
+        }
+        hero.x = nx;
+        hero.y = ny;
+        syncHero();
+        tryFight();
+      }
+
+      function onKey(e) {
+        const key = e.key.toLowerCase();
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
+          e.preventDefault();
+        }
+
+        if (key === "arrowup" || key === "w") move(0, -1);
+        if (key === "arrowdown" || key === "s") move(0, 1);
+        if (key === "arrowleft" || key === "a") move(-1, 0);
+        if (key === "arrowright" || key === "d") move(1, 0);
+      }
+
+      function resetGame() {
+        overlay.classList.remove("show");
+        hero = { ...initialHero };
+        monsters = initialMonsters.map((m) => ({ ...m }));
+        lock = false;
+        renderTerrain();
+        createMonsters();
+        syncHero();
+        setLeftCount();
+        log.textContent = "操作：方向键 / WASD 移动。沿浅色道路前进，碰到怪物自动战斗；顺序错误会直接失败。";
+      }
+
+      document.addEventListener("keydown", onKey);
+      restartBtn.addEventListener("click", resetGame);
+
+      resetGame();
+    </script>
+  </body>
+</html>

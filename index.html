@@ -60,6 +60,39 @@
         box-shadow: 0 2px 10px rgba(216, 107, 63, 0.35);
       }
 
+      .top-action {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: flex;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .happy-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.56rem 1.1rem;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        color: #fff;
+        border: 1px solid #ffd8b8;
+        background: linear-gradient(135deg, #ef7d49 0%, #d95b2d 100%);
+        box-shadow: 0 8px 20px rgba(50, 28, 12, 0.3);
+        transition: transform 180ms ease, box-shadow 180ms ease;
+      }
+
+      .happy-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(50, 28, 12, 0.34);
+      }
+
       .hero {
         min-height: 88vh;
         display: flex;
@@ -381,6 +414,10 @@
   </head>
   <body>
     <div class="scroll-line" id="scrollLine"></div>
+    <div class="top-action">
+      <a class="happy-btn" href="./happy-time.html">happy time</a>
+      <a class="happy-btn" href="./rps-online.html">online rps</a>
+    </div>
 
     <header class="hero">
       <div class="hero-panel">
@@ -493,7 +530,7 @@
             <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80" alt="山谷营地与河流" loading="lazy" />
           </figure>
           <figure class="shot">
-            <img src="https://images.unsplash.com/photo-1464822759844-d150ad6d1d95?auto=format&fit=crop&w=900&q=80" alt="雪峰与冰川地貌" loading="lazy" />
+            <img src="https://images.unsplash.com/photo-1464820453369-31d2c0b651af?auto=format&fit=crop&w=900&q=80" alt="雪峰与冰川地貌" loading="lazy" />
           </figure>
         </div>
       </section>
