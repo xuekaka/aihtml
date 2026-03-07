@@ -230,7 +230,11 @@
           <div class="status" id="statusText">连接中...</div>
         </header>
 
-        <section class="msgs" id="msgs"></section>
+        <section class="msgs" id="msgs">
+          <div id="historyLoader" style="text-align: center; padding: 0.6rem; display: none; color: var(--muted); font-size: 0.85rem;">
+            正在加载历史消息...
+          </div>
+        </section>
 
         <footer class="composer">
           <input id="imageInput" type="file" accept="image/*" hidden />
@@ -278,6 +282,9 @@
       let me = "";
       let channel = null;
       const seenIds = new Set();
+      let oldestTimestamp = null;
+      let hasMore = true;
+      let isLoadingHistory = false;
 
       function fmtTime(ts) {
         const d = new Date(ts);
@@ -293,7 +300,7 @@
         loginError.textContent = text || "";
       }
 
-      function appendMessage(row) {
+      function displayMessage(row, isPrepend = false) {
         if (!row || !row.id) return;
         if (seenIds.has(row.id)) return;
         seenIds.add(row.id);
@@ -319,13 +326,35 @@
         }
 
         item.append(meta, bubble);
-        msgs.appendChild(item);
-        msgs.scrollTop = msgs.scrollHeight;
+
+        if (isPrepend) {
+          // Prepend below the loader
+          const loader = document.getElementById("historyLoader");
+          loader.insertAdjacentElement("afterend", item);
+        } else {
+          msgs.appendChild(item);
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        // Track oldest timestamp
+        const ts = new Date(row.created_at).getTime();
+        if (!oldestTimestamp || ts < oldestTimestamp) {
+          oldestTimestamp = ts;
+        }
+      }
+
+      function appendMessage(row) {
+        displayMessage(row, false);
       }
 
       function resetMessages() {
         seenIds.clear();
+        const loader = document.getElementById("historyLoader");
         msgs.innerHTML = "";
+        msgs.appendChild(loader);
+        oldestTimestamp = null;
+        hasMore = true;
+        isLoadingHistory = false;
       }
 
       async function loadRecent() {
@@ -343,9 +372,55 @@
         }
 
         resetMessages();
+        if (data.length < 100) hasMore = false;
         data.reverse().forEach(appendMessage);
         setStatus("已连接，实时同步中");
       }
+
+      async function loadHistory() {
+        if (isLoadingHistory || !hasMore || !oldestTimestamp) return;
+
+        isLoadingHistory = true;
+        const loader = document.getElementById("historyLoader");
+        loader.style.display = "block";
+
+        const oldScrollHeight = msgs.scrollHeight;
+
+        const { data, error } = await sbClient
+          .from(TABLE_NAME)
+          .select("id,sender,type,content,image_url,created_at")
+          .lt("created_at", new Date(oldestTimestamp).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        loader.style.display = "none";
+        isLoadingHistory = false;
+
+        if (error) {
+          console.error("加载历史失败:", error);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+          return;
+        }
+
+        if (data.length < 100) hasMore = false;
+
+        // Prepend each message (desc order: newest older message first)
+        data.forEach((row) => displayMessage(row, true));
+
+        // Restore scroll position
+        msgs.scrollTop = msgs.scrollHeight - oldScrollHeight;
+      }
+
+      // Add scroll listener for infinite scrolling
+      msgs.addEventListener("scroll", () => {
+        if (msgs.scrollTop <= 5 && !isLoadingHistory && hasMore) {
+          loadHistory();
+        }
+      });
 
       async function sendMessage() {
         const content = (msgInput.value || "").trim();
