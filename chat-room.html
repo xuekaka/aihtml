@@ -140,6 +140,7 @@
         display: grid;
         gap: 0.2rem;
         margin-bottom: 0.75rem;
+        position: relative;
       }
 
       .msg.mine {
@@ -149,6 +150,41 @@
       .meta {
         color: var(--muted);
         font-size: 0.76rem;
+      }
+
+      .meta-line {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .msg.mine .meta-line {
+        justify-content: flex-end;
+      }
+
+      .meta-action {
+        border: 0;
+        background: #ffffffcc;
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 0.08rem 0.42rem;
+        cursor: pointer;
+        font-size: 0.72rem;
+        opacity: 0;
+        transition: opacity 140ms ease, transform 140ms ease;
+        transform: translateY(2px);
+      }
+
+      .msg:hover .meta-action,
+      .msg:focus-within .meta-action {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .read-receipt {
+        color: var(--muted);
+        font-size: 0.74rem;
+        padding: 0 0.15rem;
       }
 
       .bubble {
@@ -176,17 +212,108 @@
         border-radius: 10px;
       }
 
+      .quote-block {
+        border-left: 3px solid #9fc5ea;
+        background: #edf6ff;
+        color: #446174;
+        border-radius: 9px;
+        padding: 0.34rem 0.48rem;
+        margin-bottom: 0.42rem;
+        font-size: 0.84rem;
+      }
+
+      .quote-sender {
+        font-weight: 700;
+        margin-bottom: 0.1rem;
+      }
+
       .composer {
         border-top: 1px solid var(--line);
         padding: 0.7rem;
-        display: flex;
         gap: 0.6rem;
         background: #fbfdff;
+        display: grid;
       }
 
-      .composer input {
+      .composer-row {
+        display: flex;
+        gap: 0.6rem;
+      }
+
+      .composer-row input {
         min-width: 0;
         flex: 1;
+      }
+
+      .reply-bar {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #d6e2ee;
+        border-radius: 12px;
+        background: #f0f7ff;
+      }
+
+      .reply-bar.show {
+        display: flex;
+      }
+
+      .reply-copy {
+        min-width: 0;
+      }
+
+      .reply-title {
+        font-size: 0.8rem;
+        color: #4d6b80;
+        font-weight: 700;
+      }
+
+      .reply-text {
+        color: var(--ink);
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .reply-close {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .quote-menu {
+        position: fixed;
+        z-index: 40;
+        display: none;
+        min-width: 132px;
+        background: #fff;
+        border: 1px solid #d8e0e8;
+        border-radius: 12px;
+        box-shadow: 0 12px 28px rgba(32, 49, 63, 0.18);
+        overflow: hidden;
+      }
+
+      .quote-menu.show {
+        display: block;
+      }
+
+      .quote-menu button {
+        width: 100%;
+        text-align: left;
+        padding: 0.68rem 0.8rem;
+        border: 0;
+        background: #fff;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .quote-menu button:hover {
+        background: #f2f7fc;
       }
 
       .mini {
@@ -203,6 +330,11 @@
       @media (max-width: 680px) {
         .bubble {
           max-width: 90%;
+        }
+
+        .meta-action {
+          opacity: 1;
+          transform: translateY(0);
         }
       }
     </style>
@@ -237,13 +369,26 @@
         </section>
 
         <footer class="composer">
-          <input id="imageInput" type="file" accept="image/*" hidden />
-          <button class="btn" id="imageBtn" type="button">发图片</button>
-          <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
-          <button class="btn" id="sendBtn">发送</button>
+          <div class="reply-bar" id="replyBar">
+            <div class="reply-copy">
+              <div class="reply-title" id="replyTitle">正在引用</div>
+              <div class="reply-text" id="replyText"></div>
+            </div>
+            <button class="reply-close" id="replyClose" type="button" aria-label="取消引用">×</button>
+          </div>
+          <div class="composer-row">
+            <input id="imageInput" type="file" accept="image/*" hidden />
+            <button class="btn" id="imageBtn" type="button">发图片</button>
+            <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
+            <button class="btn" id="sendBtn">发送</button>
+          </div>
         </footer>
       </section>
     </main>
+
+    <div class="quote-menu" id="quoteMenu">
+      <button type="button" id="quoteMenuAction">引用这条消息</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -258,6 +403,7 @@
         飞飞: "feifei",
       };
       const TABLE_NAME = "chat_messages";
+      const READ_STATE_TABLE = "chat_read_state";
       const IMAGE_BUCKET = "chat-images";
 
       const loginPanel = document.getElementById("loginPanel");
@@ -268,6 +414,12 @@
       const statusText = document.getElementById("statusText");
       const meText = document.getElementById("meText");
       const msgs = document.getElementById("msgs");
+      const replyBar = document.getElementById("replyBar");
+      const replyTitle = document.getElementById("replyTitle");
+      const replyText = document.getElementById("replyText");
+      const replyClose = document.getElementById("replyClose");
+      const quoteMenu = document.getElementById("quoteMenu");
+      const quoteMenuAction = document.getElementById("quoteMenuAction");
       const imageInput = document.getElementById("imageInput");
       const imageBtn = document.getElementById("imageBtn");
       const msgInput = document.getElementById("msgInput");
@@ -285,11 +437,33 @@
       let oldestTimestamp = null;
       let hasMore = true;
       let isLoadingHistory = false;
+      let readStateMap = {
+        白白: null,
+        飞飞: null,
+      };
+      let replyTarget = null;
+      let quoteMenuTarget = null;
+      let longPressTimer = null;
+
+      function otherAccount() {
+        return me === "白白" ? "飞飞" : "白白";
+      }
+
+      function previewTextFromRow(row) {
+        if (!row) return "";
+        if (row.type === "image") return "[图片]";
+        return String(row.content || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      }
 
       function fmtTime(ts) {
         const d = new Date(ts);
         if (Number.isNaN(d.getTime())) return "";
         return d.toLocaleString();
+      }
+
+      function isNearBottom() {
+        const threshold = 36;
+        return msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight <= threshold;
       }
 
       function setStatus(text) {
@@ -300,6 +474,76 @@
         loginError.textContent = text || "";
       }
 
+      function clearReplyTarget() {
+        replyTarget = null;
+        replyBar.classList.remove("show");
+      }
+
+      function setReplyTarget(row) {
+        if (!row || !row.id) return;
+        replyTarget = {
+          id: row.id,
+          sender: row.sender,
+          type: row.type,
+          preview: previewTextFromRow(row),
+        };
+        replyTitle.textContent = `引用 ${row.sender}`;
+        replyText.textContent = replyTarget.preview;
+        replyBar.classList.add("show");
+        closeQuoteMenu();
+        msgInput.focus();
+      }
+
+      function closeQuoteMenu() {
+        quoteMenu.classList.remove("show");
+        quoteMenuTarget = null;
+      }
+
+      function openQuoteMenu(row, clientX, clientY) {
+        quoteMenuTarget = row;
+        const margin = 12;
+        const menuWidth = 132;
+        const menuHeight = 46;
+        const x = Math.min(clientX, window.innerWidth - menuWidth - margin);
+        const y = Math.min(clientY, window.innerHeight - menuHeight - margin);
+        quoteMenu.style.left = `${Math.max(margin, x)}px`;
+        quoteMenu.style.top = `${Math.max(margin, y)}px`;
+        quoteMenu.classList.add("show");
+      }
+
+      function bindMessageInteractions(item, row) {
+        const actionBtn = document.createElement("button");
+        actionBtn.className = "meta-action";
+        actionBtn.type = "button";
+        actionBtn.textContent = "引用";
+        actionBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          setReplyTarget(row);
+        });
+
+        const meta = item.querySelector(".meta-line");
+        meta.appendChild(actionBtn);
+
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          openQuoteMenu(row, e.clientX, e.clientY);
+        });
+
+        item.addEventListener("pointerdown", (e) => {
+          if (e.pointerType !== "touch") return;
+          clearTimeout(longPressTimer);
+          longPressTimer = window.setTimeout(() => {
+            openQuoteMenu(row, e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2);
+          }, 480);
+        });
+
+        ["pointerup", "pointermove", "pointercancel", "pointerleave"].forEach((eventName) => {
+          item.addEventListener(eventName, () => {
+            clearTimeout(longPressTimer);
+          });
+        });
+      }
+
       function displayMessage(row, isPrepend = false) {
         if (!row || !row.id) return;
         if (seenIds.has(row.id)) return;
@@ -307,13 +551,28 @@
 
         const item = document.createElement("article");
         item.className = `msg ${row.sender === me ? "mine" : ""}`;
+        item.dataset.messageId = String(row.id);
+        item.dataset.sender = row.sender;
 
         const meta = document.createElement("div");
-        meta.className = "meta";
-        meta.textContent = `${row.sender} · ${fmtTime(row.created_at)}`;
+        meta.className = "meta meta-line";
+        const metaText = document.createElement("span");
+        metaText.textContent = `${row.sender} · ${fmtTime(row.created_at)}`;
+        meta.appendChild(metaText);
 
         const bubble = document.createElement("div");
         bubble.className = "bubble";
+        if (row.reply_to_message_id) {
+          const quote = document.createElement("div");
+          quote.className = "quote-block";
+          const quoteSender = document.createElement("div");
+          quoteSender.className = "quote-sender";
+          quoteSender.textContent = row.reply_to_sender || "引用";
+          const quotePreview = document.createElement("div");
+          quotePreview.textContent = row.reply_to_preview || "";
+          quote.append(quoteSender, quotePreview);
+          bubble.appendChild(quote);
+        }
         if (row.type === "image" && row.image_url) {
           bubble.classList.add("image");
           const img = document.createElement("img");
@@ -322,10 +581,13 @@
           img.loading = "lazy";
           bubble.appendChild(img);
         } else {
-          bubble.textContent = row.content;
+          const textNode = document.createElement("div");
+          textNode.textContent = row.content;
+          bubble.appendChild(textNode);
         }
 
         item.append(meta, bubble);
+        bindMessageInteractions(item, row);
 
         if (isPrepend) {
           // Prepend below the loader
@@ -341,6 +603,8 @@
         if (!oldestTimestamp || ts < oldestTimestamp) {
           oldestTimestamp = ts;
         }
+
+        renderReadReceipt();
       }
 
       function appendMessage(row) {
@@ -361,7 +625,7 @@
         setStatus("正在读取最近100条记录...");
         const { data, error } = await sbClient
           .from(TABLE_NAME)
-          .select("id,sender,type,content,image_url,created_at")
+          .select("id,sender,type,content,image_url,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
           .order("created_at", { ascending: false })
           .limit(100);
 
@@ -374,6 +638,7 @@
         resetMessages();
         if (data.length < 100) hasMore = false;
         data.reverse().forEach(appendMessage);
+        await markAsReadIfNeeded();
         setStatus("已连接，实时同步中");
       }
 
@@ -388,7 +653,7 @@
 
         const { data, error } = await sbClient
           .from(TABLE_NAME)
-          .select("id,sender,type,content,image_url,created_at")
+          .select("id,sender,type,content,image_url,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
           .lt("created_at", new Date(oldestTimestamp).toISOString())
           .order("created_at", { ascending: false })
           .limit(100);
@@ -415,11 +680,82 @@
         msgs.scrollTop = msgs.scrollHeight - oldScrollHeight;
       }
 
+      function renderReadReceipt() {
+        msgs.querySelectorAll(".read-receipt").forEach((node) => node.remove());
+        if (!me) return;
+
+        const myMessages = Array.from(msgs.querySelectorAll(`.msg.mine[data-sender="${me}"]`));
+        const lastMine = myMessages[myMessages.length - 1];
+        if (!lastMine) return;
+
+        const myMessageId = Number(lastMine.dataset.messageId || 0);
+        if (!myMessageId) return;
+
+        const otherReadId = Number(readStateMap[otherAccount()] || 0);
+        const receipt = document.createElement("div");
+        receipt.className = "read-receipt";
+        receipt.textContent = otherReadId >= myMessageId ? "已读" : "未读";
+        lastMine.appendChild(receipt);
+      }
+
+      async function loadReadState() {
+        const { data, error } = await sbClient
+          .from(READ_STATE_TABLE)
+          .select("account,last_read_message_id");
+
+        if (error) {
+          console.error("读取已读状态失败:", error);
+          return;
+        }
+
+        readStateMap = {
+          白白: null,
+          飞飞: null,
+        };
+
+        (data || []).forEach((row) => {
+          readStateMap[row.account] = row.last_read_message_id;
+        });
+
+        renderReadReceipt();
+      }
+
+      function latestMessageId() {
+        const items = Array.from(msgs.querySelectorAll(".msg[data-message-id]"));
+        const last = items[items.length - 1];
+        return last ? Number(last.dataset.messageId || 0) : null;
+      }
+
+      async function markAsReadIfNeeded() {
+        if (!me || !document.hasFocus() || document.hidden || !isNearBottom()) return;
+
+        const targetId = latestMessageId();
+        if (!targetId) return;
+        if (readStateMap[me] && Number(readStateMap[me]) >= targetId) return;
+
+        readStateMap[me] = targetId;
+        renderReadReceipt();
+
+        const { error } = await sbClient.from(READ_STATE_TABLE).upsert(
+          {
+            account: me,
+            last_read_message_id: targetId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "account" }
+        );
+
+        if (error) {
+          console.error("更新已读状态失败:", error);
+        }
+      }
+
       // Add scroll listener for infinite scrolling
       msgs.addEventListener("scroll", () => {
         if (msgs.scrollTop <= 5 && !isLoadingHistory && hasMore) {
           loadHistory();
         }
+        markAsReadIfNeeded();
       });
 
       async function sendMessage() {
@@ -433,6 +769,10 @@
           sender: me,
           type: "text",
           content,
+          reply_to_message_id: replyTarget ? replyTarget.id : null,
+          reply_to_sender: replyTarget ? replyTarget.sender : null,
+          reply_to_type: replyTarget ? replyTarget.type : null,
+          reply_to_preview: replyTarget ? replyTarget.preview : null,
         });
         sendBtn.disabled = false;
         imageBtn.disabled = false;
@@ -444,6 +784,7 @@
         }
 
         msgInput.value = "";
+        clearReplyTarget();
         msgInput.focus();
       }
 
@@ -538,6 +879,10 @@
           type: "image",
           content: "图片",
           image_url: imageUrl,
+          reply_to_message_id: replyTarget ? replyTarget.id : null,
+          reply_to_sender: replyTarget ? replyTarget.sender : null,
+          reply_to_type: replyTarget ? replyTarget.type : null,
+          reply_to_preview: replyTarget ? replyTarget.preview : null,
         });
 
         sendBtn.disabled = false;
@@ -550,6 +895,7 @@
         }
 
         imageInput.value = "";
+        clearReplyTarget();
         setStatus("已连接，实时同步中");
       }
 
@@ -565,7 +911,18 @@
             { event: "INSERT", schema: "public", table: TABLE_NAME },
             (payload) => {
               appendMessage(payload.new);
+              markAsReadIfNeeded();
               setStatus("已连接，实时同步中");
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: READ_STATE_TABLE },
+            (payload) => {
+              const row = payload.new || payload.old;
+              if (!row || !row.account) return;
+              readStateMap[row.account] = row.last_read_message_id;
+              renderReadReceipt();
             }
           );
 
@@ -597,8 +954,10 @@
         loginPanel.style.display = "none";
         chatPanel.classList.add("show");
 
+        await loadReadState();
         await loadRecent();
         await subscribeRealtime();
+        await markAsReadIfNeeded();
       }
 
       loginBtn.addEventListener("click", doLogin);
@@ -607,6 +966,12 @@
       });
 
       sendBtn.addEventListener("click", sendMessage);
+      replyClose.addEventListener("click", clearReplyTarget);
+      quoteMenuAction.addEventListener("click", () => {
+        if (quoteMenuTarget) {
+          setReplyTarget(quoteMenuTarget);
+        }
+      });
       imageBtn.addEventListener("click", () => imageInput.click());
       imageInput.addEventListener("change", () => {
         const file = imageInput.files && imageInput.files[0];
@@ -617,6 +982,24 @@
           e.preventDefault();
           sendMessage();
         }
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          markAsReadIfNeeded();
+        }
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!quoteMenu.contains(e.target)) {
+          closeQuoteMenu();
+        }
+      });
+
+      document.addEventListener("scroll", closeQuoteMenu, { passive: true });
+
+      window.addEventListener("focus", () => {
+        markAsReadIfNeeded();
       });
     </script>
   </body>
