@@ -263,6 +263,7 @@
       .composer-row {
         display: flex;
         gap: 0.6rem;
+        align-items: center;
       }
 
       .composer-row input {
@@ -424,6 +425,29 @@
           opacity: 1;
           transform: translateY(0);
         }
+
+        .composer {
+          padding: 0.65rem;
+        }
+
+        .composer-row {
+          gap: 0.45rem;
+        }
+
+        .btn {
+          padding: 0.52rem 0.82rem;
+        }
+
+        #imageBtn,
+        #audioBtn,
+        #sendBtn {
+          flex: 0 0 auto;
+        }
+
+        #msgInput {
+          flex: 1 1 100%;
+          min-width: 0;
+        }
       }
     </style>
   </head>
@@ -480,8 +504,8 @@
           </div>
           <div class="composer-row">
             <input id="imageInput" type="file" accept="image/*" hidden />
-            <button class="btn" id="imageBtn" type="button">发图片</button>
-            <button class="btn" id="audioBtn" type="button">开始录音</button>
+            <button class="btn" id="imageBtn" type="button" aria-label="发送图片">图片</button>
+            <button class="btn" id="audioBtn" type="button" aria-label="开始录音">录音</button>
             <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
             <button class="btn" id="sendBtn">发送</button>
           </div>
@@ -618,7 +642,7 @@
           audioBtn.disabled = composerBusy || hasPendingAudio;
         }
 
-        audioBtn.textContent = isRecording ? "结束录音" : "开始录音";
+        audioBtn.textContent = isRecording ? "结束" : "录音";
       }
 
       function setRecordingUI(isRecording, text = "录音中...") {
