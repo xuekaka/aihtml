@@ -34,10 +34,12 @@
         display: grid;
         place-items: center;
         padding: 1rem;
+        overflow-x: hidden;
       }
 
       .shell {
-        width: min(980px, 96vw);
+        width: min(980px, 100%);
+        max-width: 100%;
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 18px;
