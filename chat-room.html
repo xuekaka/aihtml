@@ -214,6 +214,29 @@
         border-radius: 10px;
       }
 
+      .bubble.audio {
+        padding: 0.42rem 0.52rem;
+      }
+
+      .audio-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        font-size: 0.83rem;
+        color: #4f6678;
+        margin-bottom: 0.35rem;
+      }
+
+      .audio-wave {
+        letter-spacing: 0.05em;
+        font-weight: 700;
+      }
+
+      .bubble audio {
+        width: min(300px, 68vw);
+        display: block;
+      }
+
       .quote-block {
         border-left: 3px solid #9fc5ea;
         background: #edf6ff;
@@ -245,6 +268,28 @@
       .composer-row input {
         min-width: 0;
         flex: 1;
+      }
+
+      .recording-tip {
+        display: none;
+        align-items: center;
+        gap: 0.45rem;
+        color: #a14c32;
+        font-size: 0.86rem;
+        padding: 0 0.15rem;
+      }
+
+      .recording-tip.show {
+        display: inline-flex;
+      }
+
+      .record-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #e05841;
+        box-shadow: 0 0 0 0 rgba(224, 88, 65, 0.45);
+        animation: pulseDot 1.1s infinite;
       }
 
       .reply-bar {
@@ -288,6 +333,38 @@
         cursor: pointer;
       }
 
+      .audio-draft {
+        display: none;
+        gap: 0.6rem;
+        padding: 0.56rem 0.65rem;
+        border: 1px solid #d6e2ee;
+        border-radius: 12px;
+        background: #f4f8ff;
+      }
+
+      .audio-draft.show {
+        display: grid;
+      }
+
+      .audio-draft-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .audio-draft-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .btn.secondary {
+        color: #325a78;
+        background: linear-gradient(140deg, #eef6ff 0%, #dfeefe 100%);
+        border: 1px solid #c7ddf3;
+      }
+
       .quote-menu {
         position: fixed;
         z-index: 40;
@@ -316,6 +393,15 @@
 
       .quote-menu button:hover {
         background: #f2f7fc;
+      }
+
+      @keyframes pulseDot {
+        0% {
+          box-shadow: 0 0 0 0 rgba(224, 88, 65, 0.45);
+        }
+        100% {
+          box-shadow: 0 0 0 12px rgba(224, 88, 65, 0);
+        }
       }
 
       .mini {
@@ -378,11 +464,30 @@
             </div>
             <button class="reply-close" id="replyClose" type="button" aria-label="取消引用">×</button>
           </div>
+          <div class="audio-draft" id="audioDraftBar">
+            <div class="audio-draft-top">
+              <div class="reply-copy">
+                <div class="reply-title">语音待发送</div>
+                <div class="reply-text" id="audioDraftText">录音完成</div>
+              </div>
+              <button class="reply-close" id="audioDraftClose" type="button" aria-label="取消语音">×</button>
+            </div>
+            <audio id="audioPreviewPlayer" controls preload="metadata"></audio>
+            <div class="audio-draft-actions">
+              <button class="btn secondary" id="audioDraftRetry" type="button">重新录</button>
+              <button class="btn" id="audioDraftSend" type="button">发送语音</button>
+            </div>
+          </div>
           <div class="composer-row">
             <input id="imageInput" type="file" accept="image/*" hidden />
             <button class="btn" id="imageBtn" type="button">发图片</button>
+            <button class="btn" id="audioBtn" type="button">开始录音</button>
             <input id="msgInput" maxlength="500" placeholder="输入消息，按 Enter 发送" />
             <button class="btn" id="sendBtn">发送</button>
+          </div>
+          <div class="recording-tip" id="recordingTip">
+            <span class="record-dot" aria-hidden="true"></span>
+            <span id="recordingText">录音中...</span>
           </div>
         </footer>
       </section>
@@ -406,6 +511,7 @@
       const TABLE_NAME = "chat_messages";
       const READ_STATE_TABLE = "chat_read_state";
       const IMAGE_BUCKET = "chat-images";
+      const AUDIO_BUCKET = "chat-audios";
 
       const loginPanel = document.getElementById("loginPanel");
       const chatPanel = document.getElementById("chatPanel");
@@ -419,10 +525,19 @@
       const replyTitle = document.getElementById("replyTitle");
       const replyText = document.getElementById("replyText");
       const replyClose = document.getElementById("replyClose");
+      const audioDraftBar = document.getElementById("audioDraftBar");
+      const audioDraftText = document.getElementById("audioDraftText");
+      const audioPreviewPlayer = document.getElementById("audioPreviewPlayer");
+      const audioDraftClose = document.getElementById("audioDraftClose");
+      const audioDraftRetry = document.getElementById("audioDraftRetry");
+      const audioDraftSend = document.getElementById("audioDraftSend");
       const quoteMenu = document.getElementById("quoteMenu");
       const quoteMenuAction = document.getElementById("quoteMenuAction");
       const imageInput = document.getElementById("imageInput");
       const imageBtn = document.getElementById("imageBtn");
+      const audioBtn = document.getElementById("audioBtn");
+      const recordingTip = document.getElementById("recordingTip");
+      const recordingText = document.getElementById("recordingText");
       const msgInput = document.getElementById("msgInput");
       const sendBtn = document.getElementById("sendBtn");
 
@@ -438,6 +553,7 @@
       let oldestTimestamp = null;
       let hasMore = true;
       let isLoadingHistory = false;
+      let isBulkRendering = false;
       let readStateMap = {
         白白: null,
         飞飞: null,
@@ -445,6 +561,12 @@
       let replyTarget = null;
       let quoteMenuTarget = null;
       let longPressTimer = null;
+      let mediaRecorder = null;
+      let recordingStream = null;
+      let audioChunks = [];
+      let recordingStartedAt = 0;
+      let pendingAudio = null;
+      let composerBusy = false;
 
       function otherAccount() {
         return me === "白白" ? "飞飞" : "白白";
@@ -453,7 +575,108 @@
       function previewTextFromRow(row) {
         if (!row) return "";
         if (row.type === "image") return "[图片]";
+        if (row.type === "audio") return "[语音]";
         return String(row.content || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      }
+
+      function formatDuration(ms) {
+        const totalSeconds = Math.max(1, Math.round((ms || 0) / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function pickSupportedAudioMimeType() {
+        if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+          return "";
+        }
+        const candidates = [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/mp4",
+          "audio/ogg;codecs=opus",
+          "audio/ogg",
+        ];
+        return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      }
+
+      function refreshComposerState() {
+        const isRecording = !!(mediaRecorder && mediaRecorder.state === "recording");
+        const hasPendingAudio = !!pendingAudio;
+
+        sendBtn.disabled = composerBusy || isRecording || hasPendingAudio;
+        imageBtn.disabled = composerBusy || isRecording || hasPendingAudio;
+        msgInput.disabled = composerBusy || isRecording || hasPendingAudio;
+        replyClose.disabled = composerBusy || isRecording || hasPendingAudio;
+        audioDraftRetry.disabled = composerBusy || isRecording;
+        audioDraftSend.disabled = composerBusy || isRecording;
+        audioDraftClose.disabled = composerBusy || isRecording;
+
+        if (isRecording) {
+          audioBtn.disabled = composerBusy;
+        } else {
+          audioBtn.disabled = composerBusy || hasPendingAudio;
+        }
+
+        audioBtn.textContent = isRecording ? "结束录音" : "开始录音";
+      }
+
+      function setRecordingUI(isRecording, text = "录音中...") {
+        recordingText.textContent = text;
+        recordingTip.classList.toggle("show", isRecording);
+        refreshComposerState();
+      }
+
+      function stopRecordingStream() {
+        if (recordingStream) {
+          recordingStream.getTracks().forEach((track) => track.stop());
+          recordingStream = null;
+        }
+      }
+
+      function resetRecorderState() {
+        mediaRecorder = null;
+        audioChunks = [];
+        recordingStartedAt = 0;
+        stopRecordingStream();
+        setRecordingUI(false);
+      }
+
+      function clearPendingAudio() {
+        if (pendingAudio && pendingAudio.previewUrl) {
+          URL.revokeObjectURL(pendingAudio.previewUrl);
+        }
+        pendingAudio = null;
+        audioPreviewPlayer.pause();
+        audioPreviewPlayer.removeAttribute("src");
+        audioPreviewPlayer.load();
+        audioDraftText.textContent = "录音完成";
+        audioDraftBar.classList.remove("show");
+        refreshComposerState();
+      }
+
+      function setPendingAudio(blob, mimeType, durationMs) {
+        clearPendingAudio();
+        const previewUrl = URL.createObjectURL(blob);
+        pendingAudio = {
+          blob,
+          mimeType,
+          durationMs: Math.max(1000, durationMs || 0),
+          previewUrl,
+          replyInfo: replyTarget
+            ? {
+                id: replyTarget.id,
+                sender: replyTarget.sender,
+                type: replyTarget.type,
+                preview: replyTarget.preview,
+              }
+            : null,
+        };
+        audioDraftText.textContent = `录音完成 ${formatDuration(pendingAudio.durationMs)}，可试听后发送`;
+        audioPreviewPlayer.src = previewUrl;
+        audioDraftBar.classList.add("show");
+        setStatus("录音完成，请确认后发送");
+        refreshComposerState();
       }
 
       function fmtTime(ts) {
@@ -581,6 +804,19 @@
           img.alt = `${row.sender} 发的图片`;
           img.loading = "lazy";
           bubble.appendChild(img);
+        } else if (row.type === "audio" && row.audio_url) {
+          bubble.classList.add("audio");
+          const chip = document.createElement("div");
+          chip.className = "audio-chip";
+          chip.innerHTML = `<span class="audio-wave">)))</span><span>${row.audio_duration_ms ? formatDuration(row.audio_duration_ms) : "语音"}</span>`;
+          const audio = document.createElement("audio");
+          audio.controls = true;
+          audio.preload = "metadata";
+          audio.src = row.audio_url;
+          if (row.audio_mime) {
+            audio.setAttribute("type", row.audio_mime);
+          }
+          bubble.append(chip, audio);
         } else {
           const textNode = document.createElement("div");
           textNode.textContent = row.content;
@@ -596,7 +832,9 @@
           loader.insertAdjacentElement("afterend", item);
         } else {
           msgs.appendChild(item);
-          msgs.scrollTop = msgs.scrollHeight;
+          if (!isBulkRendering) {
+            msgs.scrollTop = msgs.scrollHeight;
+          }
         }
 
         // Track oldest timestamp
@@ -605,7 +843,9 @@
           oldestTimestamp = ts;
         }
 
-        renderReadReceipt();
+        if (!isBulkRendering) {
+          renderReadReceipt();
+        }
       }
 
       function appendMessage(row) {
@@ -626,7 +866,7 @@
         setStatus("正在读取最近100条记录...");
         const { data, error } = await sbClient
           .from(TABLE_NAME)
-          .select("id,sender,type,content,image_url,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
+          .select("id,sender,type,content,image_url,audio_url,audio_mime,audio_duration_ms,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
           .order("created_at", { ascending: false })
           .limit(100);
 
@@ -638,9 +878,12 @@
 
         resetMessages();
         if (data.length < 100) hasMore = false;
+        isBulkRendering = true;
         data.reverse().forEach(appendMessage);
-        await markAsReadIfNeeded();
-        setStatus("已连接，实时同步中");
+        isBulkRendering = false;
+        msgs.scrollTop = msgs.scrollHeight;
+        renderReadReceipt();
+        setStatus("聊天记录已加载，正在连接实时消息...");
       }
 
       async function loadHistory() {
@@ -654,7 +897,7 @@
 
         const { data, error } = await sbClient
           .from(TABLE_NAME)
-          .select("id,sender,type,content,image_url,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
+          .select("id,sender,type,content,image_url,audio_url,audio_mime,audio_duration_ms,reply_to_message_id,reply_to_sender,reply_to_type,reply_to_preview,created_at")
           .lt("created_at", new Date(oldestTimestamp).toISOString())
           .order("created_at", { ascending: false })
           .limit(100);
@@ -675,10 +918,13 @@
         if (data.length < 100) hasMore = false;
 
         // Prepend each message (desc order: newest older message first)
+        isBulkRendering = true;
         data.forEach((row) => displayMessage(row, true));
+        isBulkRendering = false;
 
         // Restore scroll position
         msgs.scrollTop = msgs.scrollHeight - oldScrollHeight;
+        renderReadReceipt();
       }
 
       function renderReadReceipt() {
@@ -764,8 +1010,8 @@
         if (!content) return;
         if (!me) return;
 
-        sendBtn.disabled = true;
-        imageBtn.disabled = true;
+        composerBusy = true;
+        refreshComposerState();
         const { error } = await sbClient.from(TABLE_NAME).insert({
           sender: me,
           type: "text",
@@ -775,8 +1021,8 @@
           reply_to_type: replyTarget ? replyTarget.type : null,
           reply_to_preview: replyTarget ? replyTarget.preview : null,
         });
-        sendBtn.disabled = false;
-        imageBtn.disabled = false;
+        composerBusy = false;
+        refreshComposerState();
 
         if (error) {
           setStatus("发送失败");
@@ -838,16 +1084,16 @@
           return;
         }
 
-        sendBtn.disabled = true;
-        imageBtn.disabled = true;
+        composerBusy = true;
+        refreshComposerState();
         setStatus("正在压缩图片...");
 
         let blob;
         try {
           blob = await compressImage(file);
         } catch (err) {
-          sendBtn.disabled = false;
-          imageBtn.disabled = false;
+          composerBusy = false;
+          refreshComposerState();
           setStatus("图片处理失败");
           alert(`图片处理失败：${err.message || err}`);
           return;
@@ -865,8 +1111,8 @@
         });
 
         if (uploadErr) {
-          sendBtn.disabled = false;
-          imageBtn.disabled = false;
+          composerBusy = false;
+          refreshComposerState();
           setStatus("上传失败");
           alert(`上传失败：${uploadErr.message}`);
           return;
@@ -886,8 +1132,8 @@
           reply_to_preview: replyTarget ? replyTarget.preview : null,
         });
 
-        sendBtn.disabled = false;
-        imageBtn.disabled = false;
+        composerBusy = false;
+        refreshComposerState();
 
         if (insertErr) {
           setStatus("发送失败");
@@ -898,6 +1144,116 @@
         imageInput.value = "";
         clearReplyTarget();
         setStatus("已连接，实时同步中");
+      }
+
+      async function sendAudioBlob(blob, mimeType, durationMs, replyInfo = null) {
+        if (!blob || !me) return;
+
+        composerBusy = true;
+        refreshComposerState();
+        setStatus("正在上传语音...");
+
+        const ext = mimeType.includes("mp4") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
+        const safeDir = ACCOUNT_DIR[me] || "user";
+        const path = `${safeDir}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${ext}`;
+
+        const { error: uploadErr } = await sbClient.storage.from(AUDIO_BUCKET).upload(path, blob, {
+          contentType: mimeType,
+          upsert: false,
+        });
+
+        if (uploadErr) {
+          composerBusy = false;
+          refreshComposerState();
+          setStatus("语音上传失败");
+          alert(`语音上传失败：${uploadErr.message}`);
+          return false;
+        }
+
+        const { data: urlData } = sbClient.storage.from(AUDIO_BUCKET).getPublicUrl(path);
+        const audioUrl = urlData && urlData.publicUrl ? urlData.publicUrl : "";
+
+        const { error: insertErr } = await sbClient.from(TABLE_NAME).insert({
+          sender: me,
+          type: "audio",
+          content: "语音",
+          audio_url: audioUrl,
+          audio_mime: mimeType,
+          audio_duration_ms: Math.max(1000, durationMs || 0),
+          reply_to_message_id: replyInfo ? replyInfo.id : null,
+          reply_to_sender: replyInfo ? replyInfo.sender : null,
+          reply_to_type: replyInfo ? replyInfo.type : null,
+          reply_to_preview: replyInfo ? replyInfo.preview : null,
+        });
+
+        composerBusy = false;
+        refreshComposerState();
+
+        if (insertErr) {
+          setStatus("发送失败");
+          alert(`发送语音消息失败：${insertErr.message}`);
+          return false;
+        }
+
+        clearReplyTarget();
+        setStatus("已连接，实时同步中");
+        return true;
+      }
+
+      async function startRecording() {
+        if (!me) return;
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function" || typeof MediaRecorder === "undefined") {
+          alert("当前浏览器不支持录音");
+          return;
+        }
+
+        const mimeType = pickSupportedAudioMimeType();
+        try {
+          recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+          alert(`无法启用麦克风：${err.message || err}`);
+          return;
+        }
+
+        try {
+          mediaRecorder = mimeType
+            ? new MediaRecorder(recordingStream, { mimeType })
+            : new MediaRecorder(recordingStream);
+        } catch (err) {
+          stopRecordingStream();
+          alert(`当前浏览器录音初始化失败：${err.message || err}`);
+          return;
+        }
+
+        audioChunks = [];
+        recordingStartedAt = Date.now();
+
+        mediaRecorder.addEventListener("dataavailable", (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        });
+
+        mediaRecorder.addEventListener("stop", async () => {
+          const durationMs = Date.now() - recordingStartedAt;
+          const finalType = mediaRecorder && mediaRecorder.mimeType ? mediaRecorder.mimeType : mimeType || "audio/webm";
+          const blob = new Blob(audioChunks, { type: finalType });
+          resetRecorderState();
+          if (blob.size > 0) {
+            setPendingAudio(blob, finalType, durationMs);
+          } else {
+            setStatus("录音为空");
+          }
+        }, { once: true });
+
+        mediaRecorder.start();
+        setRecordingUI(true, "录音中，点击结束后进入确认");
+      }
+
+      function stopRecording() {
+        if (!mediaRecorder) return;
+        setRecordingUI(true, "正在处理语音...");
+        mediaRecorder.stop();
       }
 
       async function subscribeRealtime() {
@@ -952,13 +1308,13 @@
         me = account;
         setError("");
         meText.textContent = me;
+        setStatus("正在连接...");
         loginPanel.style.display = "none";
         chatPanel.classList.add("show");
 
-        await loadReadState();
-        await loadRecent();
-        await subscribeRealtime();
-        await markAsReadIfNeeded();
+        await Promise.all([loadReadState(), loadRecent()]);
+        void subscribeRealtime();
+        void markAsReadIfNeeded();
       }
 
       loginBtn.addEventListener("click", doLogin);
@@ -968,12 +1324,40 @@
 
       sendBtn.addEventListener("click", sendMessage);
       replyClose.addEventListener("click", clearReplyTarget);
+      audioDraftClose.addEventListener("click", () => {
+        clearPendingAudio();
+        setStatus("已取消语音");
+      });
+      audioDraftRetry.addEventListener("click", async () => {
+        clearPendingAudio();
+        await startRecording();
+      });
+      audioDraftSend.addEventListener("click", async () => {
+        if (!pendingAudio) return;
+        const audioToSend = pendingAudio;
+        const sent = await sendAudioBlob(
+          audioToSend.blob,
+          audioToSend.mimeType,
+          audioToSend.durationMs,
+          audioToSend.replyInfo
+        );
+        if (sent) {
+          clearPendingAudio();
+        }
+      });
       quoteMenuAction.addEventListener("click", () => {
         if (quoteMenuTarget) {
           setReplyTarget(quoteMenuTarget);
         }
       });
       imageBtn.addEventListener("click", () => imageInput.click());
+      audioBtn.addEventListener("click", () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      });
       imageInput.addEventListener("change", () => {
         const file = imageInput.files && imageInput.files[0];
         if (file) sendImage(file);
@@ -1002,6 +1386,13 @@
       window.addEventListener("focus", () => {
         markAsReadIfNeeded();
       });
+
+      window.addEventListener("beforeunload", () => {
+        clearPendingAudio();
+        stopRecordingStream();
+      });
+
+      refreshComposerState();
     </script>
   </body>
 </html>
