@@ -22,6 +22,11 @@
         box-sizing: border-box;
       }
 
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
       body {
         margin: 0;
         min-height: 100vh;
@@ -120,6 +125,7 @@
         justify-content: space-between;
         align-items: center;
         gap: 0.6rem;
+        flex-wrap: wrap;
       }
 
       .topbar strong {
@@ -271,6 +277,11 @@
         flex: 1;
       }
 
+      #audioPreviewPlayer {
+        width: min(360px, 100%);
+        max-width: 100%;
+      }
+
       .recording-tip {
         display: none;
         align-items: center;
@@ -417,6 +428,10 @@
       }
 
       @media (max-width: 680px) {
+        body {
+          padding: 0.55rem;
+        }
+
         .bubble {
           max-width: 90%;
         }
@@ -430,23 +445,54 @@
           padding: 0.65rem;
         }
 
-        .composer-row {
-          gap: 0.45rem;
-        }
-
         .btn {
           padding: 0.52rem 0.82rem;
         }
 
-        #imageBtn,
-        #audioBtn,
-        #sendBtn {
-          flex: 0 0 auto;
+        .topbar {
+          padding: 0.75rem 0.8rem;
+          align-items: flex-start;
+        }
+
+        .msgs {
+          padding: 0.72rem 0.58rem;
+        }
+
+        .reply-text {
+          white-space: normal;
+        }
+
+        .composer-row {
+          display: grid;
+          grid-template-columns: auto auto;
+          grid-template-areas:
+            "image audio"
+            "input send";
+          gap: 0.45rem;
+          align-items: stretch;
+        }
+
+        #imageBtn {
+          grid-area: image;
+        }
+
+        #audioBtn {
+          grid-area: audio;
         }
 
         #msgInput {
-          flex: 1 1 100%;
+          grid-area: input;
           min-width: 0;
+          width: 100%;
+        }
+
+        #sendBtn {
+          grid-area: send;
+        }
+
+        .audio-draft-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
         }
       }
     </style>
