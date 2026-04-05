@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>手部开合计数</title>
+    <style>
+      :root {
+        --bg-a: #eef6ff;
+        --bg-b: #f7f1e5;
+        --ink: #25313a;
+        --muted: #63717c;
+        --line: #d6dee7;
+        --panel: rgba(255, 255, 255, 0.93);
+        --accent: #2c80c4;
+        --accent-2: #4fb26e;
+        --warn: #cd833c;
+        --danger: #c25454;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 1rem;
+        font-family: "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 10%, #ffffff 0%, transparent 28%),
+          radial-gradient(circle at 82% 12%, #fff7ea 0%, transparent 24%),
+          linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
+      }
+
+      .shell {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.1rem 1.2rem;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: 0 16px 30px rgba(27, 40, 51, 0.12);
+      }
+
+      .hero h1 {
+        margin: 0 0 0.35rem;
+        font-size: clamp(1.5rem, 3vw, 2.35rem);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 58ch;
+        line-height: 1.6;
+      }
+
+      .back {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.9fr);
+        gap: 1rem;
+      }
+
+      .stage,
+      .side {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: 0 16px 30px rgba(27, 40, 51, 0.12);
+      }
+
+      .stage {
+        padding: 0.95rem;
+      }
+
+      .camera {
+        position: relative;
+        border-radius: 18px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #182630 0%, #243847 100%);
+        aspect-ratio: 4 / 3;
+      }
+
+      video,
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+
+      video {
+        z-index: 1;
+      }
+
+      canvas {
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .camera-idle {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        text-align: center;
+        color: #e9f0f5;
+        background: linear-gradient(180deg, rgba(13, 22, 28, 0.15) 0%, rgba(13, 22, 28, 0.46) 100%);
+      }
+
+      .camera-idle.hidden {
+        display: none;
+      }
+
+      .camera-idle strong {
+        display: block;
+        font-size: 1.15rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .camera-idle span {
+        color: #c7d3dc;
+        line-height: 1.5;
+      }
+
+      .status-chip {
+        position: absolute;
+        left: 0.85rem;
+        top: 0.85rem;
+        z-index: 5;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--ink);
+        border: 1px solid rgba(214, 222, 231, 0.92);
+        backdrop-filter: blur(8px);
+      }
+
+      .status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--warn);
+      }
+
+      .status-chip.live .status-dot {
+        background: var(--accent-2);
+      }
+
+      .status-chip.error .status-dot {
+        background: var(--danger);
+      }
+
+      .camera-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+        padding-top: 0.85rem;
+      }
+
+      .camera-footer span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .side {
+        padding: 1rem;
+        display: grid;
+        gap: 0.85rem;
+        align-content: start;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 1.1rem;
+        font: inherit;
+        cursor: pointer;
+        color: #fff;
+        font-weight: 700;
+        background: linear-gradient(140deg, #3b9be0 0%, #236faf 100%);
+      }
+
+      button.secondary {
+        color: #36546c;
+        background: linear-gradient(140deg, #ecf5ff 0%, #ddebf8 100%);
+        border: 1px solid #c6dced;
+      }
+
+      button:disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 0.9rem 0.95rem;
+        background: #fbfdff;
+      }
+
+      .panel h2 {
+        margin: 0 0 0.55rem;
+        font-size: 1.04rem;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+      }
+
+      .stat {
+        border-radius: 16px;
+        padding: 0.8rem 0.9rem;
+        background: linear-gradient(145deg, #f2f8ff 0%, #ffffff 100%);
+        border: 1px solid #dbe6f2;
+      }
+
+      .stat-label {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+
+      .stat-value {
+        font-size: 1.7rem;
+        font-weight: 700;
+      }
+
+      .mini {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.65;
+      }
+
+      .mini strong {
+        color: var(--ink);
+      }
+
+      .log {
+        min-height: 2.5rem;
+        font-size: 0.92rem;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .ok {
+        color: #2c7e50;
+      }
+
+      .warn {
+        color: #9a652f;
+      }
+
+      .err {
+        color: #b94d4d;
+      }
+
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 680px) {
+        body {
+          padding: 0.7rem;
+        }
+
+        .hero,
+        .stage,
+        .side {
+          border-radius: 18px;
+        }
+
+        .stage {
+          padding: 0.72rem;
+        }
+
+        .side {
+          padding: 0.85rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <h1>手部开合计数</h1>
+          <p>
+            这是一个独立测试页：打开摄像头后，页面会实时显示手部关键点，并识别“张开 -> 握拳 -> 张开”的完整开合动作。
+            每完成一轮，计数 +1。
+          </p>
+        </div>
+        <a class="back" href="./index.html">返回首页</a>
+      </section>
+
+      <section class="layout">
+        <section class="stage">
+          <div class="camera">
+            <div class="status-chip" id="cameraStatusChip">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span id="cameraStatus">尚未开始</span>
+            </div>
+            <video id="video" playsinline muted></video>
+            <canvas id="overlay"></canvas>
+            <div class="camera-idle" id="cameraIdle">
+              <div>
+                <strong>点击“开始”后启用摄像头</strong>
+                <span>页面会在本地浏览器里完成手部识别，不需要后端。</span>
+              </div>
+            </div>
+          </div>
+          <div class="camera-footer">
+            <span>识别规则：张开 -> 握拳 -> 张开，完成一轮计数。</span>
+            <span>建议把一只手放到镜头中央，手掌正对摄像头。</span>
+          </div>
+        </section>
+
+        <aside class="side">
+          <div class="toolbar">
+            <button id="startBtn" type="button">开始</button>
+            <button class="secondary" id="stopBtn" type="button" disabled>结束</button>
+          </div>
+
+          <section class="panel">
+            <h2>当前状态</h2>
+            <div class="stat-grid">
+              <div class="stat">
+                <div class="stat-label">当前计数</div>
+                <div class="stat-value" id="countValue">0</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">手部阶段</div>
+                <div class="stat-value" id="stageValue">等待开始</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>识别说明</h2>
+            <div class="mini">
+              <strong>记数逻辑</strong><br />
+              先检测到手掌张开，再检测握拳，最后重新张开才加 1。
+              这样可以避免握拳保持不动时被连续重复计数。
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>运行日志</h2>
+            <div class="log" id="logText">准备就绪。</div>
+          </section>
+
+          <section class="panel">
+            <h2>调试信息</h2>
+            <div class="mini" id="debugText">尚未开始。</div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const MEDIAPIPE_SCRIPT_GROUPS = {
+        hands: [
+          "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+          "https://unpkg.com/@mediapipe/hands/hands.js",
+        ],
+      };
+      const HANDS_ASSET_ROOTS = [
+        "https://cdn.jsdelivr.net/npm/@mediapipe/hands",
+        "https://unpkg.com/@mediapipe/hands",
+      ];
+      const HAND_CONNECTIONS = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [5, 9], [9, 10], [10, 11], [11, 12],
+        [9, 13], [13, 14], [14, 15], [15, 16],
+        [13, 17], [17, 18], [18, 19], [19, 20],
+        [0, 17],
+      ];
+      const TIP_INDEXES = [4, 8, 12, 16, 20];
+      const MCP_INDEXES = [2, 5, 9, 13, 17];
+
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("overlay");
+      const ctx = canvas.getContext("2d");
+      const cameraIdle = document.getElementById("cameraIdle");
+      const cameraStatusChip = document.getElementById("cameraStatusChip");
+      const cameraStatus = document.getElementById("cameraStatus");
+      const countValue = document.getElementById("countValue");
+      const stageValue = document.getElementById("stageValue");
+      const logText = document.getElementById("logText");
+      const debugText = document.getElementById("debugText");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+
+      let handsApiLoaded = false;
+      let hands = null;
+      let stream = null;
+      let isRunning = false;
+      let isProcessingFrame = false;
+      let rafId = 0;
+      let count = 0;
+      let lastActionAt = 0;
+      let detectionFrameCount = 0;
+      let lastLandmarkCount = 0;
+      let activeHandsAssetRoot = HANDS_ASSET_ROOTS[0];
+      let actionState = "idle";
+      let openStableFrames = 0;
+      let fistStableFrames = 0;
+      let lastSpreadScore = 0;
+      let lastExtendedFingers = 0;
+
+      function setLog(text, tone = "") {
+        logText.textContent = text;
+        logText.className = `log ${tone}`.trim();
+      }
+
+      function setCameraStatus(text, tone = "") {
+        cameraStatus.textContent = text;
+        cameraStatusChip.className = `status-chip ${tone}`.trim();
+      }
+
+      function updateCount(nextCount) {
+        count = nextCount;
+        countValue.textContent = String(count);
+      }
+
+      function updateStage(label) {
+        stageValue.textContent = label;
+      }
+
+      function setDebug(text) {
+        debugText.textContent = text;
+      }
+
+      function resizeCanvas() {
+        const width = video.videoWidth || video.clientWidth || 640;
+        const height = video.videoHeight || video.clientHeight || 480;
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        setDebug(
+          `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount}`
+        );
+      }
+
+      function resetSession() {
+        updateCount(0);
+        lastActionAt = 0;
+        detectionFrameCount = 0;
+        lastLandmarkCount = 0;
+        openStableFrames = 0;
+        fistStableFrames = 0;
+        lastSpreadScore = 0;
+        lastExtendedFingers = 0;
+        actionState = "idle";
+        updateStage("准备中");
+      }
+
+      function loadScript(url) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = url;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`脚本加载失败: ${url}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      async function loadScriptGroup(urls) {
+        let lastError = null;
+        for (const url of urls) {
+          try {
+            await loadScript(url);
+            return url;
+          } catch (error) {
+            lastError = error;
+            console.warn("脚本加载失败:", url, error);
+          }
+        }
+        throw lastError || new Error("脚本加载失败");
+      }
+
+      async function ensureHandsApi() {
+        if (handsApiLoaded) return;
+        setLog("正在加载手部识别依赖...", "warn");
+        const handsScriptUrl = await loadScriptGroup(MEDIAPIPE_SCRIPT_GROUPS.hands);
+        activeHandsAssetRoot = handsScriptUrl.includes("unpkg.com") ? HANDS_ASSET_ROOTS[1] : HANDS_ASSET_ROOTS[0];
+        handsApiLoaded = true;
+      }
+
+      function pointDistance(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.hypot(dx, dy);
+      }
+
+      function handSpreadScore(landmarks) {
+        const wrist = landmarks[0];
+        const palmBase = landmarks[9];
+        const palmScale = Math.max(pointDistance(wrist, palmBase), 0.0001);
+        let total = 0;
+        for (let i = 0; i < TIP_INDEXES.length; i += 1) {
+          total += pointDistance(landmarks[TIP_INDEXES[i]], landmarks[MCP_INDEXES[i]]) / palmScale;
+        }
+        return total / TIP_INDEXES.length;
+      }
+
+      function extendedFingerCount(landmarks) {
+        const wrist = landmarks[0];
+        let count = 0;
+        for (const tipIndex of [8, 12, 16, 20]) {
+          const pipIndex = tipIndex - 2;
+          const tipDistance = pointDistance(landmarks[tipIndex], wrist);
+          const pipDistance = pointDistance(landmarks[pipIndex], wrist);
+          if (tipDistance > pipDistance * 1.16) {
+            count += 1;
+          }
+        }
+
+        const thumbTip = landmarks[4];
+        const thumbIp = landmarks[3];
+        const thumbMcp = landmarks[2];
+        const thumbOpen =
+          pointDistance(thumbTip, thumbMcp) > pointDistance(thumbIp, thumbMcp) * 1.1;
+        if (thumbOpen) {
+          count += 1;
+        }
+
+        return count;
+      }
+
+      function isOpenPalm(landmarks) {
+        const spread = handSpreadScore(landmarks);
+        const extended = extendedFingerCount(landmarks);
+        lastSpreadScore = spread;
+        lastExtendedFingers = extended;
+        return spread > 1.02 || extended >= 4;
+      }
+
+      function isFist(landmarks) {
+        const spread = handSpreadScore(landmarks);
+        const extended = extendedFingerCount(landmarks);
+        lastSpreadScore = spread;
+        lastExtendedFingers = extended;
+        return spread < 0.9 && extended <= 1;
+      }
+
+      function drawHand(landmarks) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!landmarks || !landmarks.length) {
+          lastLandmarkCount = 0;
+          setDebug(
+            `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount} spread=${lastSpreadScore.toFixed(2)} fingers=${lastExtendedFingers}`
+          );
+          return;
+        }
+
+        lastLandmarkCount = landmarks.length;
+        setDebug(
+          `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount} spread=${lastSpreadScore.toFixed(2)} fingers=${lastExtendedFingers}`
+        );
+
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        for (const [fromIndex, toIndex] of HAND_CONNECTIONS) {
+          const from = landmarks[fromIndex];
+          const to = landmarks[toIndex];
+
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(126, 200, 255, 0.96)";
+          ctx.lineWidth = 3.5;
+          ctx.moveTo(from.x * canvas.width, from.y * canvas.height);
+          ctx.lineTo(to.x * canvas.width, to.y * canvas.height);
+          ctx.stroke();
+        }
+
+        landmarks.forEach((point, index) => {
+          const x = point.x * canvas.width;
+          const y = point.y * canvas.height;
+          ctx.beginPath();
+          ctx.fillStyle = TIP_INDEXES.includes(index) ? "#ffd45b" : "#2f8fd6";
+          ctx.arc(x, y, TIP_INDEXES.includes(index) ? 6 : 4.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.strokeStyle = "#f7fbff";
+          ctx.lineWidth = 1.8;
+          ctx.arc(x, y, TIP_INDEXES.includes(index) ? 6 : 4.5, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        ctx.fillStyle = "#fff06a";
+        ctx.font = "700 18px sans-serif";
+        ctx.fillText(`手部点: ${landmarks.length}`, 16, 30);
+        ctx.restore();
+      }
+
+      function processHandLandmarks(landmarks) {
+        drawHand(landmarks);
+        if (!landmarks || !landmarks.length) {
+          openStableFrames = 0;
+          fistStableFrames = 0;
+          if (actionState !== "searching") {
+            actionState = "searching";
+            updateStage("未识别到手");
+            setLog("请把一只手放到镜头中央，手掌尽量正对摄像头。", "warn");
+          }
+          return;
+        }
+
+        detectionFrameCount += 1;
+        const open = isOpenPalm(landmarks);
+        const fist = isFist(landmarks);
+        setDebug(
+          `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount} spread=${lastSpreadScore.toFixed(2)} fingers=${lastExtendedFingers} openFrames=${openStableFrames} fistFrames=${fistStableFrames}`
+        );
+
+        openStableFrames = open ? openStableFrames + 1 : 0;
+        fistStableFrames = fist ? fistStableFrames + 1 : 0;
+
+        if (openStableFrames >= 2 && actionState === "idle") {
+          actionState = "opened";
+          updateStage("张开准备完成");
+          setLog("已检测到手掌张开，下一步请握拳。", "ok");
+          return;
+        }
+
+        if (fistStableFrames >= 2 && actionState === "opened") {
+          actionState = "closed";
+          updateStage("握拳完成");
+          setLog("已检测到握拳，请重新张开完成一次计数。", "ok");
+          return;
+        }
+
+        if (openStableFrames >= 2 && actionState === "closed") {
+          const now = performance.now();
+          if (now - lastActionAt > 650) {
+            updateCount(count + 1);
+            lastActionAt = now;
+            actionState = "opened";
+            updateStage("开合完成");
+            setLog(`识别成功，当前计数 ${count}。继续握拳再张开可继续计数。`, "ok");
+          }
+        } else if (open && actionState !== "opened" && actionState !== "closed") {
+          updateStage("手掌张开");
+        } else if (fist && actionState !== "closed") {
+          updateStage("握拳中");
+        } else if (!open && !fist) {
+          updateStage("动作中");
+        }
+      }
+
+      async function ensureHandsRunner() {
+        if (hands) return;
+        await ensureHandsApi();
+        setLog("正在初始化手部识别...", "warn");
+        hands = new window.Hands({
+          locateFile: (file) => `${activeHandsAssetRoot}/${file}`,
+        });
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.2,
+          minTrackingConfidence: 0.2,
+        });
+        hands.onResults((results) => {
+          const landmarks =
+            results && results.multiHandLandmarks && results.multiHandLandmarks[0]
+              ? results.multiHandLandmarks[0]
+              : null;
+          processHandLandmarks(landmarks);
+        });
+      }
+
+      async function startCamera() {
+        if (isRunning) return;
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+          setLog("当前浏览器不支持摄像头调用。", "err");
+          setCameraStatus("浏览器不支持", "error");
+          return;
+        }
+
+        startBtn.disabled = true;
+        try {
+          await ensureHandsRunner();
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+          video.srcObject = stream;
+          await video.play();
+          resizeCanvas();
+          resetSession();
+          isRunning = true;
+          cameraIdle.classList.add("hidden");
+          setCameraStatus("识别中", "live");
+          setLog("摄像头已启动。先张开手掌，再握拳，再张开完成一次计数。", "ok");
+          setDebug("摄像头已启动，等待第一帧识别结果...");
+          stopBtn.disabled = false;
+          loop();
+        } catch (error) {
+          console.error(error);
+          setCameraStatus("启动失败", "error");
+          setLog(`无法启动摄像头或模型：${error.message || error}`, "err");
+          stopCamera();
+        } finally {
+          startBtn.disabled = false;
+        }
+      }
+
+      function stopTracks() {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+      }
+
+      function stopCamera() {
+        isRunning = false;
+        isProcessingFrame = false;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        stopTracks();
+        video.pause();
+        video.srcObject = null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cameraIdle.classList.remove("hidden");
+        setCameraStatus("尚未开始");
+        setLog("已结束。你可以再次点击“开始”重新计数。");
+        updateStage("等待开始");
+        setDebug("尚未开始。");
+        stopBtn.disabled = true;
+      }
+
+      function loop() {
+        if (!isRunning) return;
+        resizeCanvas();
+
+        if (video.readyState >= 2 && !isProcessingFrame) {
+          isProcessingFrame = true;
+          hands
+            .send({ image: video })
+            .catch((error) => {
+              console.error(error);
+              setLog(`手部识别失败：${error.message || error}`, "err");
+              setCameraStatus("识别异常", "error");
+            })
+            .finally(() => {
+              isProcessingFrame = false;
+            });
+        }
+
+        rafId = requestAnimationFrame(loop);
+      }
+
+      startBtn.addEventListener("click", startCamera);
+      stopBtn.addEventListener("click", stopCamera);
+
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("beforeunload", stopTracks);
+    </script>
+  </body>
+</html>

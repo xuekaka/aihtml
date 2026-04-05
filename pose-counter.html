@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>举手计数</title>
+    <style>
+      :root {
+        --bg-a: #eef5ff;
+        --bg-b: #f6f2e8;
+        --ink: #23303a;
+        --muted: #63717a;
+        --line: #d6dee7;
+        --panel: rgba(255, 255, 255, 0.92);
+        --accent: #2577b8;
+        --accent-2: #49aa6f;
+        --warn: #ce7f3c;
+        --danger: #c15353;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 1rem;
+        font-family: "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 14% 10%, #ffffff 0%, transparent 28%),
+          radial-gradient(circle at 82% 12%, #fff7e8 0%, transparent 24%),
+          linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
+      }
+
+      .shell {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.1rem 1.2rem;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: 0 16px 30px rgba(27, 40, 51, 0.12);
+      }
+
+      .hero h1 {
+        margin: 0 0 0.35rem;
+        font-size: clamp(1.5rem, 3vw, 2.35rem);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 58ch;
+        line-height: 1.6;
+      }
+
+      .back {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.9fr);
+        gap: 1rem;
+      }
+
+      .stage,
+      .side {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: 0 16px 30px rgba(27, 40, 51, 0.12);
+      }
+
+      .stage {
+        padding: 0.95rem;
+      }
+
+      .camera {
+        position: relative;
+        border-radius: 18px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #182630 0%, #243847 100%);
+        aspect-ratio: 4 / 3;
+      }
+
+      video,
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+
+      video {
+        z-index: 1;
+      }
+
+      canvas {
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .camera-idle {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        text-align: center;
+        color: #e9f0f5;
+        background: linear-gradient(180deg, rgba(13, 22, 28, 0.15) 0%, rgba(13, 22, 28, 0.46) 100%);
+      }
+
+      .camera-idle.hidden {
+        display: none;
+      }
+
+      .camera-idle strong {
+        display: block;
+        font-size: 1.15rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .camera-idle span {
+        color: #c7d3dc;
+        line-height: 1.5;
+      }
+
+      .status-chip {
+        position: absolute;
+        left: 0.85rem;
+        top: 0.85rem;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--ink);
+        border: 1px solid rgba(214, 222, 231, 0.92);
+        backdrop-filter: blur(8px);
+      }
+
+      .status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--warn);
+      }
+
+      .status-chip.live .status-dot {
+        background: var(--accent-2);
+      }
+
+      .status-chip.error .status-dot {
+        background: var(--danger);
+      }
+
+      .camera-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+        padding-top: 0.85rem;
+      }
+
+      .camera-footer span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .side {
+        padding: 1rem;
+        display: grid;
+        gap: 0.85rem;
+        align-content: start;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 1.1rem;
+        font: inherit;
+        cursor: pointer;
+        color: #fff;
+        font-weight: 700;
+        background: linear-gradient(140deg, #3b9be0 0%, #236faf 100%);
+      }
+
+      button.secondary {
+        color: #36546c;
+        background: linear-gradient(140deg, #ecf5ff 0%, #ddebf8 100%);
+        border: 1px solid #c6dced;
+      }
+
+      button:disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 0.9rem 0.95rem;
+        background: #fbfdff;
+      }
+
+      .panel h2 {
+        margin: 0 0 0.55rem;
+        font-size: 1.04rem;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+      }
+
+      .stat {
+        border-radius: 16px;
+        padding: 0.8rem 0.9rem;
+        background: linear-gradient(145deg, #f2f8ff 0%, #ffffff 100%);
+        border: 1px solid #dbe6f2;
+      }
+
+      .stat-label {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+
+      .stat-value {
+        font-size: 1.7rem;
+        font-weight: 700;
+      }
+
+      .mini {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.65;
+      }
+
+      .mini strong {
+        color: var(--ink);
+      }
+
+      .log {
+        min-height: 2.5rem;
+        font-size: 0.92rem;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .ok {
+        color: #2c7e50;
+      }
+
+      .warn {
+        color: #9a652f;
+      }
+
+      .err {
+        color: #b94d4d;
+      }
+
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 680px) {
+        body {
+          padding: 0.7rem;
+        }
+
+        .hero,
+        .stage,
+        .side {
+          border-radius: 18px;
+        }
+
+        .stage {
+          padding: 0.72rem;
+        }
+
+        .side {
+          padding: 0.85rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <h1>举手计数</h1>
+          <p>
+            这是一个独立测试页：打开摄像头后，页面会实时显示骨架点，并识别“双手同时上举”的动作。
+            从双手放下到双手举过肩部，计数 +1。
+          </p>
+        </div>
+        <a class="back" href="./index.html">返回首页</a>
+      </section>
+
+      <section class="layout">
+        <section class="stage">
+          <div class="camera">
+            <div class="status-chip" id="cameraStatusChip">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span id="cameraStatus">尚未开始</span>
+            </div>
+            <video id="video" playsinline muted></video>
+            <canvas id="overlay"></canvas>
+            <div class="camera-idle" id="cameraIdle">
+              <div>
+                <strong>点击“开始”后启用摄像头</strong>
+                <span>页面会在本地浏览器里完成姿态识别，不需要后端。</span>
+              </div>
+            </div>
+          </div>
+          <div class="camera-footer">
+            <span>识别规则：双手都举过头顶才记为“上举”。</span>
+            <span>建议站在 1.5 米左右、让上半身完整进入画面。</span>
+          </div>
+        </section>
+
+        <aside class="side">
+          <div class="toolbar">
+            <button id="startBtn" type="button">开始</button>
+            <button class="secondary" id="stopBtn" type="button" disabled>结束</button>
+          </div>
+
+          <section class="panel">
+            <h2>当前状态</h2>
+            <div class="stat-grid">
+              <div class="stat">
+                <div class="stat-label">当前计数</div>
+                <div class="stat-value" id="countValue">0</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">动作阶段</div>
+                <div class="stat-value" id="stageValue">等待开始</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>识别说明</h2>
+            <div class="mini">
+              <strong>记数逻辑</strong><br />
+              先检测双手都回到头部以下，再检测双手同时举过头顶。每次完成一组“下 -> 上”才加 1，
+              避免同一次上举被连续重复计数。
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>运行日志</h2>
+            <div class="log" id="logText">准备就绪。</div>
+          </section>
+
+          <section class="panel">
+            <h2>调试信息</h2>
+            <div class="mini" id="debugText">尚未开始。</div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const MODEL_PATH =
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+      const VISION_IMPORT_URLS = [
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs",
+        "https://unpkg.com/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs",
+      ];
+      const WASM_ROOTS = [
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm",
+        "https://unpkg.com/@mediapipe/tasks-vision@0.10.21/wasm",
+      ];
+      const LANDMARK = {
+        NOSE: 0,
+        LEFT_SHOULDER: 11,
+        RIGHT_SHOULDER: 12,
+        LEFT_ELBOW: 13,
+        RIGHT_ELBOW: 14,
+        LEFT_WRIST: 15,
+        RIGHT_WRIST: 16,
+        LEFT_HIP: 23,
+        RIGHT_HIP: 24,
+      };
+      const SKELETON_CONNECTIONS = [
+        [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER],
+        [LANDMARK.LEFT_SHOULDER, LANDMARK.LEFT_ELBOW],
+        [LANDMARK.LEFT_ELBOW, LANDMARK.LEFT_WRIST],
+        [LANDMARK.RIGHT_SHOULDER, LANDMARK.RIGHT_ELBOW],
+        [LANDMARK.RIGHT_ELBOW, LANDMARK.RIGHT_WRIST],
+        [LANDMARK.LEFT_SHOULDER, LANDMARK.LEFT_HIP],
+        [LANDMARK.RIGHT_SHOULDER, LANDMARK.RIGHT_HIP],
+        [LANDMARK.LEFT_HIP, LANDMARK.RIGHT_HIP],
+      ];
+      const HIGHLIGHT_POINTS = [
+        LANDMARK.NOSE,
+        LANDMARK.LEFT_SHOULDER,
+        LANDMARK.RIGHT_SHOULDER,
+        LANDMARK.LEFT_ELBOW,
+        LANDMARK.RIGHT_ELBOW,
+        LANDMARK.LEFT_WRIST,
+        LANDMARK.RIGHT_WRIST,
+        LANDMARK.LEFT_HIP,
+        LANDMARK.RIGHT_HIP,
+      ];
+
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("overlay");
+      const ctx = canvas.getContext("2d");
+      const cameraIdle = document.getElementById("cameraIdle");
+      const cameraStatusChip = document.getElementById("cameraStatusChip");
+      const cameraStatus = document.getElementById("cameraStatus");
+      const countValue = document.getElementById("countValue");
+      const stageValue = document.getElementById("stageValue");
+      const logText = document.getElementById("logText");
+      const debugText = document.getElementById("debugText");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+
+      let poseLandmarker = null;
+      let stream = null;
+      let isRunning = false;
+      let rafId = 0;
+      let lastVideoTime = -1;
+      let count = 0;
+      let stage = "idle";
+      let readyDown = false;
+      let upStableFrames = 0;
+      let downStableFrames = 0;
+      let lastRepAt = 0;
+      let detectionFrameCount = 0;
+      let lastLandmarkCount = 0;
+      let visionApi = null;
+
+      function setLog(text, tone = "") {
+        logText.textContent = text;
+        logText.className = `log ${tone}`.trim();
+      }
+
+      function setCameraStatus(text, tone = "") {
+        cameraStatus.textContent = text;
+        cameraStatusChip.className = `status-chip ${tone}`.trim();
+      }
+
+      function updateCount(nextCount) {
+        count = nextCount;
+        countValue.textContent = String(count);
+      }
+
+      function updateStage(label) {
+        stageValue.textContent = label;
+      }
+
+      function setDebug(text) {
+        debugText.textContent = text;
+      }
+
+      function resizeCanvas() {
+        const width = video.videoWidth || video.clientWidth || 640;
+        const height = video.videoHeight || video.clientHeight || 480;
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        setDebug(
+          `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount}`
+        );
+      }
+
+      function landmarkVisible(point) {
+        return point && (point.visibility == null || point.visibility > 0.55);
+      }
+
+      function bothHandsRaised(landmarks) {
+        const leftWrist = landmarks[LANDMARK.LEFT_WRIST];
+        const rightWrist = landmarks[LANDMARK.RIGHT_WRIST];
+        const nose = landmarks[LANDMARK.NOSE];
+
+        if (![leftWrist, rightWrist, nose].every(landmarkVisible)) {
+          return false;
+        }
+
+        const leftRaised = leftWrist.y < nose.y - 0.03;
+        const rightRaised = rightWrist.y < nose.y - 0.03;
+        return leftRaised && rightRaised;
+      }
+
+      function bothHandsDown(landmarks) {
+        const leftWrist = landmarks[LANDMARK.LEFT_WRIST];
+        const rightWrist = landmarks[LANDMARK.RIGHT_WRIST];
+        const nose = landmarks[LANDMARK.NOSE];
+
+        if (![leftWrist, rightWrist, nose].every(landmarkVisible)) {
+          return false;
+        }
+
+        const leftDown = leftWrist.y > nose.y + 0.04;
+        const rightDown = rightWrist.y > nose.y + 0.04;
+        return leftDown && rightDown;
+      }
+
+      function resetSession() {
+        updateCount(0);
+        readyDown = false;
+        upStableFrames = 0;
+        downStableFrames = 0;
+        lastRepAt = 0;
+        stage = "idle";
+        updateStage("准备中");
+      }
+
+      async function importVisionApi() {
+        if (visionApi) return visionApi;
+        let lastError = null;
+        for (const url of VISION_IMPORT_URLS) {
+          try {
+            visionApi = await import(url);
+            return visionApi;
+          } catch (error) {
+            lastError = error;
+            console.warn("MediaPipe 依赖加载失败:", url, error);
+          }
+        }
+        throw lastError || new Error("MediaPipe 依赖加载失败");
+      }
+
+      function drawLandmarks(landmarks) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!landmarks || !landmarks.length) {
+          lastLandmarkCount = 0;
+          setDebug(
+            `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount}`
+          );
+          return;
+        }
+
+        lastLandmarkCount = landmarks.length;
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        setDebug(
+          `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount}`
+        );
+
+        for (const [fromIndex, toIndex] of SKELETON_CONNECTIONS) {
+          const from = landmarks[fromIndex];
+          const to = landmarks[toIndex];
+          if (!landmarkVisible(from) || !landmarkVisible(to)) continue;
+
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(127, 196, 255, 0.95)";
+          ctx.lineWidth = 4;
+          ctx.moveTo(from.x * canvas.width, from.y * canvas.height);
+          ctx.lineTo(to.x * canvas.width, to.y * canvas.height);
+          ctx.stroke();
+        }
+
+        for (const index of HIGHLIGHT_POINTS) {
+          const point = landmarks[index];
+          if (!landmarkVisible(point)) continue;
+
+          const x = point.x * canvas.width;
+          const y = point.y * canvas.height;
+
+          ctx.beginPath();
+          ctx.fillStyle = "#2e8dd8";
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.strokeStyle = "#f7fbff";
+          ctx.lineWidth = 2;
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = "#fff06a";
+        ctx.font = "700 18px sans-serif";
+        ctx.fillText(`骨架点: ${landmarks.length}`, 16, 30);
+
+        ctx.restore();
+      }
+
+      function processPoseLandmarks(landmarks) {
+        drawLandmarks(landmarks);
+        if (!landmarks || !landmarks.length) {
+          upStableFrames = 0;
+          downStableFrames = 0;
+          if (stage !== "searching") {
+            stage = "searching";
+            updateStage("未识别到人");
+            setLog("请站到镜头里，让上半身完整出现在画面中。", "warn");
+          }
+          return;
+        }
+
+        detectionFrameCount += 1;
+        const raised = bothHandsRaised(landmarks);
+        const lowered = bothHandsDown(landmarks);
+
+        upStableFrames = raised ? upStableFrames + 1 : 0;
+        downStableFrames = lowered ? downStableFrames + 1 : 0;
+
+        if (downStableFrames >= 3) {
+          readyDown = true;
+          if (stage !== "armed") {
+            stage = "armed";
+            updateStage("准备完成");
+            setLog("已检测到双手回到头部以下，下一次双手举过头顶会计数。", "ok");
+          }
+        }
+
+        if (readyDown && upStableFrames >= 3) {
+          const now = performance.now();
+          if (now - lastRepAt > 700) {
+            updateCount(count + 1);
+            lastRepAt = now;
+            readyDown = false;
+            stage = "up";
+            updateStage("上举完成");
+            setLog(`识别成功，当前计数 ${count}。`, "ok");
+          }
+        } else if (raised && !readyDown && stage !== "hold") {
+          stage = "hold";
+          updateStage("保持上举");
+        } else if (!raised && !lowered && stage !== "moving") {
+          stage = "moving";
+          updateStage("动作中");
+        }
+      }
+
+      async function ensurePoseRunner() {
+        if (poseLandmarker) return;
+        setLog("正在加载姿态识别模型...", "warn");
+        const visionApiModule = await importVisionApi();
+        const { FilesetResolver, PoseLandmarker } = visionApiModule;
+
+        let lastError = null;
+        for (const wasmRoot of WASM_ROOTS) {
+          try {
+            const vision = await FilesetResolver.forVisionTasks(wasmRoot);
+            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+              baseOptions: {
+                modelAssetPath: MODEL_PATH,
+              },
+              runningMode: "VIDEO",
+              numPoses: 1,
+              minPoseDetectionConfidence: 0.35,
+              minPosePresenceConfidence: 0.35,
+              minTrackingConfidence: 0.35,
+            });
+            return;
+          } catch (error) {
+            lastError = error;
+            console.warn("MediaPipe WASM 初始化失败:", wasmRoot, error);
+          }
+        }
+
+        throw lastError || new Error("姿态识别模型初始化失败");
+      }
+
+      async function startCamera() {
+        if (isRunning) return;
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+          setLog("当前浏览器不支持摄像头调用。", "err");
+          setCameraStatus("浏览器不支持", "error");
+          return;
+        }
+
+        startBtn.disabled = true;
+        try {
+          await ensurePoseRunner();
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+          video.srcObject = stream;
+          await video.play();
+          resizeCanvas();
+          resetSession();
+          isRunning = true;
+          lastVideoTime = -1;
+          detectionFrameCount = 0;
+          lastLandmarkCount = 0;
+          cameraIdle.classList.add("hidden");
+          setCameraStatus("识别中", "live");
+          setLog("摄像头已启动。双手先回到头部以下，再一起举过头顶。", "ok");
+          setDebug("摄像头已启动，等待第一帧识别结果...");
+          stopBtn.disabled = false;
+          loop();
+        } catch (error) {
+          console.error(error);
+          setCameraStatus("启动失败", "error");
+          setLog(`无法启动摄像头或模型：${error.message || error}`, "err");
+          stopCamera();
+        } finally {
+          startBtn.disabled = false;
+        }
+      }
+
+      function stopTracks() {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+      }
+
+      function stopCamera() {
+        isRunning = false;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        stopTracks();
+        video.pause();
+        video.srcObject = null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        lastLandmarkCount = 0;
+        cameraIdle.classList.remove("hidden");
+        setCameraStatus("尚未开始");
+        setLog("已结束。你可以再次点击“开始”重新计数。");
+        updateStage("等待开始");
+        setDebug("尚未开始。");
+        stopBtn.disabled = true;
+      }
+
+      function loop() {
+        if (!isRunning) return;
+        resizeCanvas();
+
+        if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+          try {
+            const result = poseLandmarker.detectForVideo(video, performance.now());
+            const landmarks = result && result.landmarks && result.landmarks[0] ? result.landmarks[0] : null;
+            processPoseLandmarks(landmarks);
+            lastVideoTime = video.currentTime;
+          } catch (error) {
+            console.error(error);
+            setLog(`骨架识别失败：${error.message || error}`, "err");
+            setCameraStatus("识别异常", "error");
+          }
+        }
+
+        rafId = requestAnimationFrame(loop);
+      }
+
+      startBtn.addEventListener("click", startCamera);
+      stopBtn.addEventListener("click", stopCamera);
+
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("beforeunload", stopTracks);
+    </script>
+  </body>
+</html>
