@@ -581,7 +581,7 @@
         const extended = extendedFingerCount(landmarks);
         lastSpreadScore = spread;
         lastExtendedFingers = extended;
-        return spread > 1.02 || extended >= 4;
+        return spread > 0.98 || extended >= 4;
       }
 
       function isFist(landmarks) {
@@ -589,7 +589,7 @@
         const extended = extendedFingerCount(landmarks);
         lastSpreadScore = spread;
         lastExtendedFingers = extended;
-        return spread < 0.9 && extended <= 1;
+        return spread < 1.02 && extended <= 2;
       }
 
       function drawHand(landmarks) {
@@ -660,12 +660,13 @@
         detectionFrameCount += 1;
         const open = isOpenPalm(landmarks);
         const fist = isFist(landmarks);
+
+        openStableFrames = open ? openStableFrames + 1 : Math.max(0, openStableFrames - 1);
+        fistStableFrames = fist ? fistStableFrames + 1 : Math.max(0, fistStableFrames - 1);
+
         setDebug(
           `video=${video.videoWidth || 0}x${video.videoHeight || 0} canvas=${canvas.width}x${canvas.height} detections=${detectionFrameCount} landmarks=${lastLandmarkCount} spread=${lastSpreadScore.toFixed(2)} fingers=${lastExtendedFingers} openFrames=${openStableFrames} fistFrames=${fistStableFrames}`
         );
-
-        openStableFrames = open ? openStableFrames + 1 : 0;
-        fistStableFrames = fist ? fistStableFrames + 1 : 0;
 
         if (openStableFrames >= 2 && actionState === "idle") {
           actionState = "opened";
@@ -676,6 +677,7 @@
 
         if (fistStableFrames >= 2 && actionState === "opened") {
           actionState = "closed";
+          openStableFrames = 0;
           updateStage("握拳完成");
           setLog("已检测到握拳，请重新张开完成一次计数。", "ok");
           return;
@@ -687,6 +689,7 @@
             updateCount(count + 1);
             lastActionAt = now;
             actionState = "opened";
+            fistStableFrames = 0;
             updateStage("开合完成");
             setLog(`识别成功，当前计数 ${count}。继续握拳再张开可继续计数。`, "ok");
           }
