@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>白白 & 飞飞</title>
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main-pane">
+      <header class="topbar">
+        <div class="topbar-spacer" aria-hidden="true"></div>
+        <div class="topbar-title">可爱飞飞</div>
+        <button id="controlToggle" class="control-toggle" type="button" aria-label="打开功能面板">⋯</button>
+      </header>
+
+      <div id="timelineWrapper" class="timeline-wrapper">
+        <div id="timeline" class="timeline"></div>
+      </div>
+    </main>
+  </div>
+
+  <aside id="controlPanel" class="control-panel hidden">
+    <div class="control-hero">
+      <div class="eyebrow">WeChat Archive</div>
+      <h1 id="chatTitle">白白 & 飞飞</h1>
+      <p id="chatStats" class="muted"></p>
+    </div>
+
+    <section class="control-section">
+      <label class="field-label" for="searchInput">文本搜索</label>
+      <input id="searchInput" type="search" placeholder="输入关键词，搜索正文内容">
+      <div id="searchResults" class="search-results"></div>
+    </section>
+
+    <section class="control-section">
+      <label class="field-label" for="jumpDate">日期跳转</label>
+      <div class="button-row">
+        <input id="jumpDate" type="date">
+        <button id="jumpDateBtn" type="button">跳转</button>
+      </div>
+    </section>
+
+    <section class="control-section">
+      <label class="field-label" for="typePicker">类型浏览</label>
+      <select id="typePicker">
+        <option value="">全部</option>
+        <option value="text">文本</option>
+        <option value="image">图片</option>
+        <option value="voice">语音</option>
+        <option value="video">视频</option>
+      </select>
+      <div id="typeSummary" class="muted small"></div>
+    </section>
+  </aside>
+
+  <div id="panelBackdrop" class="panel-backdrop hidden"></div>
+
+  <div id="lightbox" class="lightbox hidden">
+    <button id="lightboxClose" class="lightbox-close" type="button">关闭</button>
+    <div id="lightboxBody" class="lightbox-body"></div>
+  </div>
+
+  <script src="viewer-data/meta.js"></script>
+  <script src="viewer-data/search-index.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>
