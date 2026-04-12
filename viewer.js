@@ -1,11 +1,23 @@
 (() => {
   const meta = window.__CHAT_VIEWER_META__;
   const chunkStore = window.__CHAT_VIEWER_CHUNKS__ = window.__CHAT_VIEWER_CHUNKS__ || {};
-  const searchMonthStore = window.__CHAT_VIEWER_SEARCH_MONTHS__ = window.__CHAT_VIEWER_SEARCH_MONTHS__ || {};
   const chunkPromises = new Map();
-  const searchMonthPromises = new Map();
   const DISPLAY_ME = "可爱飞飞";
   const DISPLAY_OTHER = "可爱白白";
+  const SUPABASE_CONFIG = window.__CHAT_VIEWER_SUPABASE__ || null;
+  const supabaseGlobal = window.supabase;
+  const sbClient =
+    SUPABASE_CONFIG &&
+    supabaseGlobal &&
+    typeof supabaseGlobal.createClient === "function"
+      ? supabaseGlobal.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        })
+      : null;
   const state = {
     loadedChunks: new Set(),
     renderedChunks: [],
@@ -49,10 +61,6 @@
     return `viewer-data/chunks/chunk-${String(chunkId).padStart(4, "0")}.js`;
   }
 
-  function searchMonthSrc(entry) {
-    return `viewer-data/search/${entry.file}`;
-  }
-
   function ensureChunk(chunkId) {
     if (chunkStore[chunkId]) return Promise.resolve(chunkStore[chunkId]);
     if (chunkPromises.has(chunkId)) return chunkPromises.get(chunkId);
@@ -64,20 +72,6 @@
       document.body.appendChild(script);
     });
     chunkPromises.set(chunkId, promise);
-    return promise;
-  }
-
-  function ensureSearchMonth(entry) {
-    if (searchMonthStore[entry.month]) return Promise.resolve(searchMonthStore[entry.month]);
-    if (searchMonthPromises.has(entry.month)) return searchMonthPromises.get(entry.month);
-    const promise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = searchMonthSrc(entry);
-      script.onload = () => resolve(searchMonthStore[entry.month] || []);
-      script.onerror = () => reject(new Error(`failed to load search month ${entry.month}`));
-      document.body.appendChild(script);
-    });
-    searchMonthPromises.set(entry.month, promise);
     return promise;
   }
 
@@ -674,19 +668,16 @@
     el.searchResults.appendChild(loading);
   }
 
-  async function searchAcrossMonths(query) {
-    const entries = meta.searchMonths || [];
-    const loadedMonths = await Promise.all(entries.map((entry) => ensureSearchMonth(entry)));
-    const results = [];
-    for (const monthRecords of loadedMonths) {
-      for (const record of monthRecords) {
-        if (record[5].includes(query)) {
-          results.push(record);
-        }
-      }
+  async function searchViaSupabase(query) {
+    if (!sbClient) {
+      throw new Error("supabase client unavailable");
     }
-    results.sort((a, b) => b[2] - a[2]);
-    return results;
+    const { data, error } = await sbClient.rpc("search_chat_messages", {
+      p_query: query,
+      p_limit: 120,
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
   }
 
   function renderSearchResults(records, query) {
@@ -708,12 +699,16 @@
       item.type = "button";
       item.className = "search-item";
       item.innerHTML = `
-        <div class="meta">${escapeHtml(formatTimestamp(record[2]))} · ${escapeHtml(displaySenderName(record[3]))}</div>
-        <div class="body">${escapeHtml(makeSnippet(record[4], query))}</div>
+        <div class="meta">${escapeHtml(formatTimestamp(record.ts_unix))} · ${escapeHtml(displaySenderName(record.sender))}</div>
+        <div class="body">${escapeHtml(makeSnippet(record.body, query))}</div>
       `;
       item.addEventListener("click", async () => {
         closePanel();
-        await jumpToMessage(record[0], { highlight: true, clearType: true, chunkHint: record[1] });
+        await jumpToMessage(record.message_id, {
+          highlight: true,
+          clearType: true,
+          chunkHint: record.chunk_id,
+        });
       });
       fragment.appendChild(item);
     }
@@ -729,7 +724,7 @@
     const runId = ++state.searchRunId;
     renderSearchLoading();
     try {
-      const results = await searchAcrossMonths(query.toLowerCase());
+      const results = await searchViaSupabase(query);
       if (runId !== state.searchRunId) return;
       renderSearchResults(results, query);
     } catch (error) {
