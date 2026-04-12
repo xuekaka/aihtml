@@ -1,8 +1,9 @@
 (() => {
   const meta = window.__CHAT_VIEWER_META__;
-  const searchIndex = window.__CHAT_VIEWER_SEARCH_INDEX__ || [];
   const chunkStore = window.__CHAT_VIEWER_CHUNKS__ = window.__CHAT_VIEWER_CHUNKS__ || {};
+  const searchMonthStore = window.__CHAT_VIEWER_SEARCH_MONTHS__ = window.__CHAT_VIEWER_SEARCH_MONTHS__ || {};
   const chunkPromises = new Map();
+  const searchMonthPromises = new Map();
   const DISPLAY_ME = "可爱飞飞";
   const DISPLAY_OTHER = "可爱白白";
   const state = {
@@ -16,6 +17,7 @@
     loadingNext: false,
     activeAudio: null,
     activeAudioUi: null,
+    searchRunId: 0,
   };
 
   const el = {
@@ -47,6 +49,10 @@
     return `viewer-data/chunks/chunk-${String(chunkId).padStart(4, "0")}.js`;
   }
 
+  function searchMonthSrc(entry) {
+    return `viewer-data/search/${entry.file}`;
+  }
+
   function ensureChunk(chunkId) {
     if (chunkStore[chunkId]) return Promise.resolve(chunkStore[chunkId]);
     if (chunkPromises.has(chunkId)) return chunkPromises.get(chunkId);
@@ -58,6 +64,20 @@
       document.body.appendChild(script);
     });
     chunkPromises.set(chunkId, promise);
+    return promise;
+  }
+
+  function ensureSearchMonth(entry) {
+    if (searchMonthStore[entry.month]) return Promise.resolve(searchMonthStore[entry.month]);
+    if (searchMonthPromises.has(entry.month)) return searchMonthPromises.get(entry.month);
+    const promise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = searchMonthSrc(entry);
+      script.onload = () => resolve(searchMonthStore[entry.month] || []);
+      script.onerror = () => reject(new Error(`failed to load search month ${entry.month}`));
+      document.body.appendChild(script);
+    });
+    searchMonthPromises.set(entry.month, promise);
     return promise;
   }
 
@@ -85,13 +105,7 @@
   }
 
   function firstVisibleChunkForType(type) {
-    for (let i = searchIndex.length - 1; i >= 0; i -= 1) {
-      const recordType = searchIndex[i][5];
-      if (type === "text" ? isTextualType(recordType) : recordType === type) {
-        return searchIndex[i][1];
-      }
-    }
-    return meta.chunkCount - 1;
+    return meta.typeStartChunks?.[type] ?? meta.chunkCount - 1;
   }
 
   function renderMessage(message, previousDay) {
@@ -126,7 +140,11 @@
       `;
       quote.addEventListener("click", () => {
         if (message.quote.targetId) {
-          jumpToMessage(message.quote.targetId, { highlight: true, clearType: true });
+          jumpToMessage(message.quote.targetId, {
+            highlight: true,
+            clearType: true,
+            chunkHint: message.quote.targetChunk,
+          });
         } else {
           showLightbox(`<div class="bubble"><div class="message-text">${escapeHtml(message.quote.preview || "未能定位到原消息")}</div></div>`);
         }
@@ -510,7 +528,7 @@
       });
     }
     if (options.targetId) {
-      requestAnimationFrame(() => jumpToMessage(options.targetId, { highlight: true }));
+      requestAnimationFrame(() => jumpToMessage(options.targetId, { highlight: true, chunkHint: anchorChunk }));
     }
   }
 
@@ -596,11 +614,17 @@
   }
 
   async function jumpToMessage(messageId, options = {}) {
-    const record = meta.messageMap[messageId];
-    if (!record) return;
+    const chunkHint = options.chunkHint ?? meta.messageMap?.[messageId]?.chunk;
+    if (chunkHint == null) {
+      const node = el.timeline.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+      if (!node) return;
+      node.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      highlightMessage(messageId);
+      return;
+    }
     if (options.clearType) clearTypeMode();
-    if (!state.loadedChunks.has(record.chunk)) {
-      await resetAroundChunk(record.chunk, { targetId: messageId });
+    if (!state.loadedChunks.has(chunkHint)) {
+      await resetAroundChunk(chunkHint, { targetId: messageId });
       return;
     }
     requestAnimationFrame(() => {
@@ -627,10 +651,6 @@
     window.setTimeout(() => node.classList.remove("highlight"), 2600);
   }
 
-  function searchRecordMatchesText(record) {
-    return record[5] === "text";
-  }
-
   function makeSnippet(text, query) {
     const source = String(text || "").trim();
     if (!source) return "";
@@ -644,6 +664,29 @@
     const prefix = start > 0 ? "..." : "";
     const suffix = end < source.length ? "..." : "";
     return `${prefix}${source.slice(start, end)}${suffix}`;
+  }
+
+  function renderSearchLoading() {
+    el.searchResults.replaceChildren();
+    const loading = document.createElement("div");
+    loading.className = "search-empty";
+    loading.textContent = "正在搜索正文内容...";
+    el.searchResults.appendChild(loading);
+  }
+
+  async function searchAcrossMonths(query) {
+    const entries = meta.searchMonths || [];
+    const loadedMonths = await Promise.all(entries.map((entry) => ensureSearchMonth(entry)));
+    const results = [];
+    for (const monthRecords of loadedMonths) {
+      for (const record of monthRecords) {
+        if (record[5].includes(query)) {
+          results.push(record);
+        }
+      }
+    }
+    results.sort((a, b) => b[2] - a[2]);
+    return results;
   }
 
   function renderSearchResults(records, query) {
@@ -665,32 +708,38 @@
       item.type = "button";
       item.className = "search-item";
       item.innerHTML = `
-        <div class="meta">${escapeHtml(formatTimestamp(record[3]))} · ${escapeHtml(displaySenderName(record[4]))}</div>
-        <div class="body">${escapeHtml(makeSnippet(record[6], query))}</div>
+        <div class="meta">${escapeHtml(formatTimestamp(record[2]))} · ${escapeHtml(displaySenderName(record[3]))}</div>
+        <div class="body">${escapeHtml(makeSnippet(record[4], query))}</div>
       `;
       item.addEventListener("click", async () => {
         closePanel();
-        await jumpToMessage(record[0], { highlight: true, clearType: true });
+        await jumpToMessage(record[0], { highlight: true, clearType: true, chunkHint: record[1] });
       });
       fragment.appendChild(item);
     }
     el.searchResults.appendChild(fragment);
   }
 
-  function runSearch() {
+  async function runSearch() {
     const query = el.searchInput.value.trim();
     if (!query) {
       clearSearchResults();
       return;
     }
-    const results = [];
-    for (const record of searchIndex) {
-      if (!searchRecordMatchesText(record)) continue;
-      if (!record[7].includes(query.toLowerCase())) continue;
-      results.push(record);
+    const runId = ++state.searchRunId;
+    renderSearchLoading();
+    try {
+      const results = await searchAcrossMonths(query.toLowerCase());
+      if (runId !== state.searchRunId) return;
+      renderSearchResults(results, query);
+    } catch (error) {
+      if (runId !== state.searchRunId) return;
+      console.error(error);
+      const empty = document.createElement("div");
+      empty.className = "search-empty";
+      empty.textContent = "搜索索引加载失败，请稍后再试";
+      el.searchResults.replaceChildren(empty);
     }
-    results.sort((a, b) => b[3] - a[3]);
-    renderSearchResults(results, query);
   }
 
   function formatTimestamp(ts) {
@@ -749,12 +798,15 @@
 
     el.searchInput.addEventListener("input", () => {
       clearTimeout(state.searchTimer);
+      state.searchRunId += 1;
       el.jumpDate.value = "";
       if (state.activeType) {
         clearTypeMode();
         resetAroundChunk(meta.chunkCount - 1, { scrollBottom: true }).catch(console.error);
       }
-      state.searchTimer = window.setTimeout(runSearch, 120);
+      state.searchTimer = window.setTimeout(() => {
+        runSearch().catch(console.error);
+      }, 120);
     });
 
     const jumpByDate = async () => {
