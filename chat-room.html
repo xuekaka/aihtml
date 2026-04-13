@@ -573,15 +573,11 @@
       const SUPABASE_KEY =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkemVxc2lqcm50bmJkcWRxeWFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjUyMzMsImV4cCI6MjA4Nzk0MTIzM30.4Cd4h4XEdDZUvpQU6rlM08cEU8cZ5wqW3J_oYfxJVqk";
 
-      const ALLOWED_ACCOUNTS = new Set(["白白", "飞飞"]);
-      const ACCOUNT_DIR = {
-        白白: "baibai",
-        飞飞: "feifei",
-      };
       const TABLE_NAME = "chat_messages";
       const READ_STATE_TABLE = "chat_read_state";
-      const IMAGE_BUCKET = "chat-images";
-      const AUDIO_BUCKET = "chat-audios";
+      const CHAT_AUTH_FN = "chat-auth";
+      const CHAT_WRITE_FN = "chat-write";
+      const CHAT_READ_STATE_FN = "chat-read-state";
 
       const loginPanel = document.getElementById("loginPanel");
       const chatPanel = document.getElementById("chatPanel");
@@ -618,6 +614,7 @@
           : null;
 
       let me = "";
+      let sessionPassword = "";
       let channel = null;
       const seenIds = new Set();
       let oldestTimestamp = null;
@@ -640,6 +637,55 @@
 
       function otherAccount() {
         return me === "白白" ? "飞飞" : "白白";
+      }
+
+      function functionUrl(name) {
+        return `${SUPABASE_URL}/functions/v1/${name}`;
+      }
+
+      async function readFunctionError(resp) {
+        let payload = null;
+        try {
+          payload = await resp.json();
+        } catch (_) {
+          // Ignore JSON parse failure and fall back to status text.
+        }
+        const message =
+          payload && typeof payload.error === "string" && payload.error
+            ? payload.error
+            : resp.statusText || `请求失败（${resp.status}）`;
+        throw new Error(message);
+      }
+
+      async function invokeChatJson(functionName, body) {
+        const resp = await fetch(functionUrl(functionName), {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          await readFunctionError(resp);
+        }
+        return await resp.json();
+      }
+
+      async function invokeChatForm(functionName, formData) {
+        const resp = await fetch(functionUrl(functionName), {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+          body: formData,
+        });
+        if (!resp.ok) {
+          await readFunctionError(resp);
+        }
+        return await resp.json();
       }
 
       function previewTextFromRow(row) {
@@ -1053,16 +1099,13 @@
         readStateMap[me] = targetId;
         renderReadReceipt();
 
-        const { error } = await sbClient.from(READ_STATE_TABLE).upsert(
-          {
+        try {
+          await invokeChatJson(CHAT_READ_STATE_FN, {
             account: me,
+            password: sessionPassword,
             last_read_message_id: targetId,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "account" }
-        );
-
-        if (error) {
+          });
+        } catch (error) {
           console.error("更新已读状态失败:", error);
         }
       }
@@ -1082,23 +1125,26 @@
 
         composerBusy = true;
         refreshComposerState();
-        const { error } = await sbClient.from(TABLE_NAME).insert({
-          sender: me,
-          type: "text",
-          content,
-          reply_to_message_id: replyTarget ? replyTarget.id : null,
-          reply_to_sender: replyTarget ? replyTarget.sender : null,
-          reply_to_type: replyTarget ? replyTarget.type : null,
-          reply_to_preview: replyTarget ? replyTarget.preview : null,
-        });
-        composerBusy = false;
-        refreshComposerState();
-
-        if (error) {
+        try {
+          await invokeChatJson(CHAT_WRITE_FN, {
+            account: me,
+            password: sessionPassword,
+            type: "text",
+            content,
+            reply_to_message_id: replyTarget ? replyTarget.id : null,
+            reply_to_sender: replyTarget ? replyTarget.sender : null,
+            reply_to_type: replyTarget ? replyTarget.type : null,
+            reply_to_preview: replyTarget ? replyTarget.preview : null,
+          });
+        } catch (error) {
+          composerBusy = false;
+          refreshComposerState();
           setStatus("发送失败");
-          alert(`发送失败：${error.message}`);
+          alert(`发送失败：${error.message || error}`);
           return;
         }
+        composerBusy = false;
+        refreshComposerState();
 
         msgInput.value = "";
         clearReplyTarget();
@@ -1141,12 +1187,6 @@
         return blob;
       }
 
-      function extByType(type) {
-        if (type === "image/png") return "png";
-        if (type === "image/webp") return "webp";
-        return "jpg";
-      }
-
       async function sendImage(file) {
         if (!file || !me) return;
         if (!file.type || !file.type.startsWith("image/")) {
@@ -1170,46 +1210,31 @@
         }
 
         const type = blob.type || file.type || "image/jpeg";
-        const ext = extByType(type);
-        const safeDir = ACCOUNT_DIR[me] || "user";
-        const path = `${safeDir}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${ext}`;
+        const uploadFile = new File([blob], file.name || `image.${type.split("/")[1] || "jpg"}`, {
+          type,
+        });
+        const form = new FormData();
+        form.append("account", me);
+        form.append("password", sessionPassword);
+        form.append("type", "image");
+        form.append("file", uploadFile);
+        form.append("reply_to_message_id", replyTarget ? String(replyTarget.id) : "");
+        form.append("reply_to_sender", replyTarget ? replyTarget.sender : "");
+        form.append("reply_to_type", replyTarget ? replyTarget.type : "");
+        form.append("reply_to_preview", replyTarget ? replyTarget.preview : "");
 
         setStatus("正在上传图片...");
-        const { error: uploadErr } = await sbClient.storage.from(IMAGE_BUCKET).upload(path, blob, {
-          contentType: type,
-          upsert: false,
-        });
-
-        if (uploadErr) {
+        try {
+          await invokeChatForm(CHAT_WRITE_FN, form);
+        } catch (error) {
           composerBusy = false;
           refreshComposerState();
-          setStatus("上传失败");
-          alert(`上传失败：${uploadErr.message}`);
+          setStatus("发送失败");
+          alert(`发送图片消息失败：${error.message || error}`);
           return;
         }
-
-        const { data: urlData } = sbClient.storage.from(IMAGE_BUCKET).getPublicUrl(path);
-        const imageUrl = urlData && urlData.publicUrl ? urlData.publicUrl : "";
-
-        const { error: insertErr } = await sbClient.from(TABLE_NAME).insert({
-          sender: me,
-          type: "image",
-          content: "图片",
-          image_url: imageUrl,
-          reply_to_message_id: replyTarget ? replyTarget.id : null,
-          reply_to_sender: replyTarget ? replyTarget.sender : null,
-          reply_to_type: replyTarget ? replyTarget.type : null,
-          reply_to_preview: replyTarget ? replyTarget.preview : null,
-        });
-
         composerBusy = false;
         refreshComposerState();
-
-        if (insertErr) {
-          setStatus("发送失败");
-          alert(`发送图片消息失败：${insertErr.message}`);
-          return;
-        }
 
         imageInput.value = "";
         clearReplyTarget();
@@ -1223,47 +1248,30 @@
         refreshComposerState();
         setStatus("正在上传语音...");
 
-        const ext = mimeType.includes("mp4") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
-        const safeDir = ACCOUNT_DIR[me] || "user";
-        const path = `${safeDir}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${ext}`;
+        const ext = mimeType.includes("mp4") ? "m4a" : mimeType.includes("ogg") ? "ogg" : mimeType.includes("wav") ? "wav" : "webm";
+        const uploadFile = new File([blob], `voice.${ext}`, { type: mimeType || "audio/webm" });
+        const form = new FormData();
+        form.append("account", me);
+        form.append("password", sessionPassword);
+        form.append("type", "audio");
+        form.append("file", uploadFile);
+        form.append("audio_duration_ms", String(Math.max(1000, durationMs || 0)));
+        form.append("reply_to_message_id", replyInfo ? String(replyInfo.id) : "");
+        form.append("reply_to_sender", replyInfo ? replyInfo.sender : "");
+        form.append("reply_to_type", replyInfo ? replyInfo.type : "");
+        form.append("reply_to_preview", replyInfo ? replyInfo.preview : "");
 
-        const { error: uploadErr } = await sbClient.storage.from(AUDIO_BUCKET).upload(path, blob, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-        if (uploadErr) {
+        try {
+          await invokeChatForm(CHAT_WRITE_FN, form);
+        } catch (error) {
           composerBusy = false;
           refreshComposerState();
-          setStatus("语音上传失败");
-          alert(`语音上传失败：${uploadErr.message}`);
+          setStatus("发送失败");
+          alert(`发送语音消息失败：${error.message || error}`);
           return false;
         }
-
-        const { data: urlData } = sbClient.storage.from(AUDIO_BUCKET).getPublicUrl(path);
-        const audioUrl = urlData && urlData.publicUrl ? urlData.publicUrl : "";
-
-        const { error: insertErr } = await sbClient.from(TABLE_NAME).insert({
-          sender: me,
-          type: "audio",
-          content: "语音",
-          audio_url: audioUrl,
-          audio_mime: mimeType,
-          audio_duration_ms: Math.max(1000, durationMs || 0),
-          reply_to_message_id: replyInfo ? replyInfo.id : null,
-          reply_to_sender: replyInfo ? replyInfo.sender : null,
-          reply_to_type: replyInfo ? replyInfo.type : null,
-          reply_to_preview: replyInfo ? replyInfo.preview : null,
-        });
-
         composerBusy = false;
         refreshComposerState();
-
-        if (insertErr) {
-          setStatus("发送失败");
-          alert(`发送语音消息失败：${insertErr.message}`);
-          return false;
-        }
 
         clearReplyTarget();
         setStatus("已连接，实时同步中");
@@ -1365,8 +1373,8 @@
 
       async function doLogin() {
         const account = (accountInput.value || "").trim();
-        if (!ALLOWED_ACCOUNTS.has(account)) {
-          setError("登录失败：账号只能是“白白”或“飞飞”。");
+        if (!account) {
+          setError("登录失败：请输入账号。");
           return;
         }
 
@@ -1375,7 +1383,18 @@
           return;
         }
 
+        try {
+          await invokeChatJson(CHAT_AUTH_FN, {
+            account,
+            password: account,
+          });
+        } catch (error) {
+          setError("登录失败：请检查输入。");
+          return;
+        }
+
         me = account;
+        sessionPassword = account;
         setError("");
         meText.textContent = me;
         setStatus("正在连接...");
